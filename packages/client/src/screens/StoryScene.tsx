@@ -22,14 +22,14 @@ function portraitSrc(id: string, expr: Expression | undefined, revealed?: boolea
  * Key: '<mage>' for the default, '<mage>-<expression>' to override one picture.
  */
 const FACING: Record<string, 'left' | 'right' | 'front'> = {
-  ember: 'left',
-  rime: 'right',
+  ember: 'right',
+  rime: 'left',
   briar: 'front',
-  nyx: 'right',
+  nyx: 'left',
   volt: 'front',
-  'volt-sad': 'left',
-  'volt-surprised': 'left',
-  hollow: 'right',
+  'volt-sad': 'right',
+  'volt-surprised': 'right',
+  hollow: 'left',
 };
 
 function facingOf(id: string, expr: Expression | undefined) {
