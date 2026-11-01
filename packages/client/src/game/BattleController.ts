@@ -157,7 +157,9 @@ export type VfxKind =
   | 'stun'
   | 'empower'
   | 'cleanse'
-  | 'ultimate';
+  | 'ultimate'
+  /** Your own non-ultimate cast: a portrait banner on the callout stage. */
+  | 'cast';
 
 export interface Vfx {
   id: number;
@@ -195,7 +197,8 @@ const VFX_MS: Record<VfxKind, number> = {
   stun: 900,
   empower: 1000,
   cleanse: 900,
-  ultimate: 1250,
+  ultimate: 1500,
+  cast: 1100,
 };
 
 /** Effects that land on the opponent (so the spell flies across). */
@@ -534,6 +537,7 @@ export class BattleController {
             if (e.caster === 0) audio.play(e.tier === 'ultimate' ? 'ultimate' : 'spell');
             const ult = e.tier === 'ultimate';
             if (ult) this.pushVfx({ kind: 'ultimate', side: e.caster, color: ch.palette.primary, label: e.name, theme: ch.id, power: 1 });
+            else if (e.caster === 0) this.pushVfx({ kind: 'cast', side: 0, color: ch.palette.primary, label: e.name, theme: ch.id, power: 0.6 });
             if (flyingNow) {
               this.pushVfx({
                 kind: 'projectile',

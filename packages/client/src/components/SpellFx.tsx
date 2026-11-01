@@ -98,17 +98,25 @@ export function SpellFxLayer({
     return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
   };
   const rects: [Rect | null, Rect | null] = [rectOf(0), rectOf(1)];
+  const t0 = (v: Vfx) => clamp01((now - v.born) / v.duration);
+  const stageCasts = vfx.filter((v) => v.side === 0 && (v.kind === 'cast' || v.kind === 'ultimate'));
+  const stageTop = stageCasts.filter((v) => v.kind === 'ultimate').pop() ?? stageCasts.pop();
   const stageRect = (() => {
     const el = stage?.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    return r.height > 60 ? { x: r.left - base.left, y: r.top - base.top, w: r.width, h: Math.min(r.height, 220) } : null;
+    return r.height > 60 ? { x: r.left - base.left, y: r.top - base.top, w: r.width, h: Math.min(r.height, 280) } : null;
   })();
 
   return (
     <div className="spellfx-layer">
       {vfx.map((v) => {
         const target = rects[v.side];
+        if (v.kind === 'cast' || (v.kind === 'ultimate' && v.side === 0 && stageRect)) {
+          // Your casts take turns on the stage: show only the newest (an ultimate beats a regular cast).
+          if (v !== stageTop) return null;
+          return stageRect ? <StageBanner key={v.id} v={v} t={t0(v)} r={stageRect} /> : null;
+        }
         if (!target) return null;
         const t = clamp01((now - v.born) / v.duration);
         if (v.kind === 'projectile') {
@@ -536,6 +544,66 @@ function stunStyle(
       return { background: `${c}22`, boxShadow: `inset 0 0 50px ${c}88`, opacity: env };
     }
   }
+}
+
+// ---- your casts on the callout stage ---------------------------------------------------
+
+/**
+ * The big portrait banner for your own casts, played in the open area to the right so it never
+ * covers your board. Ultimates get the full treatment (bigger, longer, color burst and rays).
+ */
+function StageBanner({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
+  const ch = v.theme ? getCharacter(v.theme) : null;
+  const ult = v.kind === 'ultimate';
+  const fx = mageFx(v.theme, v.color);
+  const inT = ult ? 0.14 : 0.18;
+  const outT = ult ? 0.82 : 0.78;
+  // Band sweeps in from the left, holds, then flies off to the right.
+  const x = t < inT ? -1 + easeOut(t / inT) : t > outT ? easeOut((t - outT) / (1 - outT)) : 0;
+  const pop = t < inT ? easeOut(t / inT) : t > outT ? 1 - (t - outT) / (1 - outT) : 1;
+  const bandH = r.h * (ult ? 0.5 : 0.4);
+  const face = Math.min(r.h * (ult ? 0.9 : 0.74), r.w * 0.42);
+  const nameSize = Math.max(22, Math.min(ult ? 60 : 44, r.w * (ult ? 0.1 : 0.075)));
+  // Keep the whole portrait inside the stage (it sits at the bottom edge of the window).
+  const cy = Math.min(r.h * 0.6, r.h - face / 2 - 6);
+  return (
+    <div className="fx-stage" style={{ left: r.x, top: r.y, width: r.w, height: r.h, '--c': fx.main, '--l': fx.light } as CSSProperties}>
+      {ult && (
+        <div
+          className="fx-stage-rays"
+          style={{ left: r.w * 0.28 - r.h, top: cy - r.h, width: r.h * 2, height: r.h * 2, opacity: pop * 0.8, transform: `rotate(${t * 90}deg) scale(${0.6 + 0.4 * pop})` }}
+        />
+      )}
+      <div
+        className="fx-stage-burst"
+        style={{ left: r.w * 0.28 - face, top: cy - face, width: face * 2, height: face * 2, opacity: pop * (ult ? 0.9 : 0.6) }}
+      />
+      <div className="fx-stage-band" style={{ top: cy - bandH / 2, height: bandH, transform: `translateX(${x * 110}%) skewY(-6deg)` }} />
+      {ch && (
+        <img
+          className="fx-stage-face"
+          src={`assets/portraits/${ch.id}.png`}
+          alt=""
+          onError={(e) => (e.currentTarget.style.display = 'none')}
+          style={{
+            left: r.w * 0.28 - face / 2 + x * r.w * 0.6,
+            top: cy - face / 2,
+            width: face,
+            height: face,
+            transform: `scale(${0.7 + 0.3 * pop})`,
+            opacity: clamp01(pop * 1.4),
+          }}
+        />
+      )}
+      <div
+        className="fx-stage-text"
+        style={{ left: r.w * 0.28 + face / 2 + 12 + x * r.w * 0.8, top: cy - bandH / 2, height: bandH, opacity: clamp01(pop * 1.4) }}
+      >
+        <small style={{ fontSize: Math.max(10, nameSize * 0.3) }}>{ult ? 'ULTIMATE' : 'SPELL'}</small>
+        <span style={{ fontSize: nameSize }}>{v.label}</span>
+      </div>
+    </div>
+  );
 }
 
 // ---- ultimate banner ---------------------------------------------------------------

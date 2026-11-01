@@ -2566,3 +2566,57 @@ small {
 .callout-stage .float-shield {
   font-size: 24px;
 }
+
+/* Your casts on the callout stage (StageBanner) */
+.fx-stage {
+  position: absolute;
+  overflow: visible;
+}
+.fx-stage > * {
+  position: absolute;
+}
+.fx-stage-band {
+  left: -6%;
+  right: -6%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 80%, #120624) 12%, color-mix(in srgb, var(--c) 70%, #120624) 88%, transparent);
+  border-top: 3px solid color-mix(in srgb, var(--l) 80%, #fff);
+  border-bottom: 3px solid color-mix(in srgb, var(--l) 80%, #fff);
+  box-shadow: 0 0 40px var(--c), inset 0 0 30px rgba(255, 255, 255, 0.15);
+}
+.fx-stage-burst {
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--l) 80%, #fff) 0 18%, var(--c) 40%, transparent 70%);
+  mix-blend-mode: screen;
+  filter: blur(4px);
+}
+.fx-stage-rays {
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--c) 55%, transparent) 0 6deg, transparent 6deg 18deg);
+  mask-image: radial-gradient(circle, #000 20%, transparent 68%);
+  -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 68%);
+}
+.fx-stage-face {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #fff;
+  background: radial-gradient(circle at 30% 25%, var(--l), var(--c) 70%);
+  box-shadow: 0 0 30px var(--c), 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+.fx-stage-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  z-index: 3;
+  white-space: nowrap;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.65);
+}
+.fx-stage-text small {
+  letter-spacing: 0.35em;
+  opacity: 0.9;
+}
+.fx-stage-text span {
+  font-family: var(--display);
+  font-weight: 800;
+  line-height: 1.02;
+}

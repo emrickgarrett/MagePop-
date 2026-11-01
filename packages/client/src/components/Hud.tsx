@@ -103,11 +103,12 @@ export function PlayerPanel({
  * full banner here instead (drawn by SpellFxLayer), so their text is skipped.
  */
 export const CalloutStage = forwardRef<HTMLDivElement, { fx: FloatFx[] }>(function CalloutStage({ fx }, ref) {
-  const shown = fx.filter((f) => f.kind !== 'ultimate');
+  // Spell names show on the portrait banner; numbers and statuses float above it.
+  const shown = fx.filter((f) => f.kind !== 'ultimate' && f.kind !== 'spell').slice(-3);
   return (
     <div className="callout-stage" ref={ref}>
       {shown.map((f, i) => (
-        <div key={f.id} className={`float float-${f.kind}`} style={{ color: f.kind === 'spell' ? f.color : undefined, top: `${30 + (i % 4) * 40}px` }}>
+        <div key={f.id} className={`float float-${f.kind}`} style={{ color: f.kind === 'spell' ? f.color : undefined, top: `${(i % 3) * 34}px` }}>
           {f.text}
         </div>
       ))}
