@@ -64,6 +64,8 @@ type Screen =
       spotlight?: GemColor[];
       /** Label on the opponent's panel (e.g. ECHO). */
       opponentTag?: string;
+      /** Story: the scene's location painted behind the battle. */
+      backdrop?: string;
       onEnd: (r: BattleResult) => void;
       music: MusicTrack;
     }
@@ -322,6 +324,8 @@ export function App() {
           detail: node.title,
           opponentTag: fightNode?.mystery ? '???' : w.echo ? 'ECHO' : undefined,
           spotlight: node.spotlight,
+          // The fight happens where the intro scene ends up.
+          backdrop: [...node.intro].reverse().find((l) => l.bg)?.bg,
           // Bosses play their own theme, and so does every fight against the Hollow (her theme is the tell).
           music: battleTheme(node.kind === 'boss' || w.opponent === 'hollow' ? w.opponent : chap.hero),
           onEnd: (r) => {
@@ -672,6 +676,7 @@ export function App() {
             firstBattle={!save.seenHowToPlay && screen.mode !== 'pvp'}
             makeController={screen.makeController}
             opponentTag={screen.opponentName ?? screen.opponentTag}
+            backdrop={screen.backdrop}
             cosmetics={{ frame: equippedFrame(save), board: myBoardTheme(save, screen.setup.player) }}
             onGuideSeen={() => {
               const s2 = { ...saveRef.current, seenHowToPlay: true };

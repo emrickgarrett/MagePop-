@@ -3925,3 +3925,23 @@ small {
     animation: none !important;
   }
 }
+
+/* Story battles: the scene's location behind the arena, dimmed and softened so boards stay readable. */
+.battle-screen.has-backdrop {
+  isolation: isolate;
+}
+.battle-backdrop {
+  position: fixed;
+  inset: -12px;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(3px) brightness(0.42) saturate(1.1);
+  animation: vn-fade 0.8s ease-out;
+}
+.battle-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 75% 65% at 50% 55%, transparent 40%, rgba(8, 3, 20, 0.6));
+}

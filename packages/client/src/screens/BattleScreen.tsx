@@ -63,6 +63,7 @@ export function BattleScreen({
   makeController,
   opponentTag,
   cosmetics,
+  backdrop,
   onEnd,
   onQuit,
 }: {
@@ -79,6 +80,8 @@ export function BattleScreen({
   opponentTag?: string;
   /** Star reward cosmetics for your side: portrait frame and board background. */
   cosmetics?: { frame: string | null; board: string | null };
+  /** Story: a location painted (dimmed) behind everything. */
+  backdrop?: string;
   onEnd: (r: BattleResult) => void;
   /** Forfeit from the pause menu (counts as a loss). */
   onQuit: (r: BattleResult) => void;
@@ -172,7 +175,8 @@ export function BattleScreen({
   }
 
   return (
-    <div className="battle-screen" ref={rootRef}>
+    <div className={`battle-screen ${backdrop ? 'has-backdrop' : ''}`} ref={rootRef}>
+      {backdrop && <div className="battle-backdrop" style={{ backgroundImage: `url(assets/scenes/${backdrop}.jpg)` }} />}
       <div className="battle-top">
         <div className="battle-header">
           {header}
