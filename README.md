@@ -64,6 +64,11 @@ spell built from effect primitives (`damage`, `poison`, `freeze`, `stun`, `conve
 the UI is generated from the effects, so it can't drift from the numbers. Run `npm run sim` to check
 balance, then add a story chapter flavor block in `packages/core/src/story.ts`.
 
+Give the mage a spell-effect theme in `MAGE_FX` (`packages/client/src/components/SpellFx.tsx`): main
+and light colors, a particle (`ember`, `flake`, `leaf`, `wisp`, `spark`) and a stun style (`flames`,
+`frost`, `vines`, `hex`, `lightning`). Hits, stuns, heals, shields and buffs they cause use it. Without
+an entry they fall back to their palette with sparks and lightning.
+
 ## Art
 
 All art is generated with GameDeveloperHarness into `art/` (the raw outputs), then made game-ready:

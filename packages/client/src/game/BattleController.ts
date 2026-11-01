@@ -173,6 +173,7 @@ export interface Vfx {
   /** 0..1 strength (bigger hits, ultimates). */
   power: number;
   gem?: GemColor;
+  /** The mage behind it (styles the effect). */
   theme?: string;
   /** Ultimate banner text. */
   label?: string;
@@ -386,8 +387,11 @@ export class BattleController {
     this.fx.push({ id: this.fxId++, side, kind, text, color, born: this.realNow });
   }
 
-  private pushVfx(v: Omit<Vfx, 'id' | 'born' | 'duration' | 'power'> & { power?: number; duration?: number }) {
-    this.vfx.push({ power: 0.5, duration: VFX_MS[v.kind], ...v, id: this.fxId++, born: this.realNow });
+  /** `by` = the side whose mage caused it; its theme styles the effect (Rime's stun is ice, Volt's is lightning). */
+  private pushVfx(v: Omit<Vfx, 'id' | 'born' | 'duration' | 'power'> & { power?: number; duration?: number; by?: PlayerIndex }) {
+    const { by, ...rest } = v;
+    const theme = rest.theme ?? (by !== undefined ? this.state.players[by].characterId : undefined);
+    this.vfx.push({ power: 0.5, duration: VFX_MS[v.kind], ...rest, theme, id: this.fxId++, born: this.realNow });
   }
 
   /**
@@ -497,9 +501,9 @@ export class BattleController {
           const first = e.steps[0]?.kind;
           this.deferBoard(e.player, travel ? delay : 0, () => {
             if (frames.length) this.enqueue(e.player, frames);
-            if (first === 'freeze') this.pushVfx({ kind: 'freeze', side: e.player, color: '#bfeaff' });
-            else if (first === 'shatter') this.pushVfx({ kind: 'shatter', side: e.player, color: '#dff6ff', power: 0.9 });
-            else if (first === 'petrify') this.pushVfx({ kind: 'petrify', side: e.player, color: '#b9a98f' });
+            if (first === 'freeze') this.pushVfx({ kind: 'freeze', side: e.player, color: '#bfeaff', by: (1 - e.player) as PlayerIndex });
+            else if (first === 'shatter') this.pushVfx({ kind: 'shatter', side: e.player, color: '#dff6ff', power: 0.9, by: (1 - e.player) as PlayerIndex });
+            else if (first === 'petrify') this.pushVfx({ kind: 'petrify', side: e.player, color: '#b9a98f', by: (1 - e.player) as PlayerIndex });
           });
           this.boardSounds(e.player, e.steps, travel ? delay : 0, true);
           break;
@@ -553,7 +557,7 @@ export class BattleController {
               this.pushFx(e.target, 'damage', `-${total}${e.absorbed ? ` (${e.absorbed} blocked)` : ''}`);
               this.shake[e.target] = this.realNow;
               if (!this.dotLabels.has(e.source) && e.source !== 'basic') {
-                this.pushVfx({ kind: 'impact', side: e.target, color: e.absorbed > e.amount ? '#7fc8ff' : '#ff7a4d', power: Math.min(1, total / 24) });
+                this.pushVfx({ kind: 'impact', side: e.target, color: '#ff7a4d', power: Math.min(1, total / 24), by: (1 - e.target) as PlayerIndex });
               }
               // You hear: your hits on them, and their spells hitting you (not their basic 3-match
               // chip damage). Poison/burn ticks get a soft bubble instead of a hit.
@@ -572,7 +576,7 @@ export class BattleController {
             delay,
             () => {
               this.pushFx(e.target, 'heal', `+${e.amount}`);
-              if (e.source !== 'Regen') this.pushVfx({ kind: 'heal', side: e.target, color: '#7dffa8', power: Math.min(1, e.amount / 14) });
+              if (e.source !== 'Regen') this.pushVfx({ kind: 'heal', side: e.target, color: '#7dffa8', power: Math.min(1, e.amount / 14), by: e.target });
               if (e.target === 0 && e.source !== 'Regen') audio.play('heal');
             },
             { p: e.target, hp: -e.amount, shield: 0 },
@@ -583,7 +587,7 @@ export class BattleController {
             delay,
             () => {
               this.pushFx(e.target, 'shield', `+${e.amount} shield`);
-              this.pushVfx({ kind: 'shield', side: e.target, color: '#7fc8ff', power: Math.min(1, e.amount / 12) });
+              this.pushVfx({ kind: 'shield', side: e.target, color: '#7fc8ff', power: Math.min(1, e.amount / 12), by: e.target });
               if (e.target === 0) audio.play('shield');
             },
             { p: e.target, hp: 0, shield: -e.amount },
@@ -595,9 +599,9 @@ export class BattleController {
             this.pushFx(e.target, 'status', e.status.label);
             if (e.status.kind === 'poison') {
               const burn = /burn|fire|flame/i.test(e.status.label);
-              this.pushVfx({ kind: burn ? 'burn' : 'poison', side: e.target, color: burn ? '#ff9a3c' : '#9be15d' });
+              this.pushVfx({ kind: burn ? 'burn' : 'poison', side: e.target, color: burn ? '#ff9a3c' : '#9be15d', by: (1 - e.target) as PlayerIndex });
             } else {
-              this.pushVfx({ kind: 'heal', side: e.target, color: '#b8ff9c', power: 0.35 });
+              this.pushVfx({ kind: 'heal', side: e.target, color: '#b8ff9c', power: 0.35, by: e.target });
             }
             if (e.status.kind === 'poison' && e.target === 0) audio.play('poison');
           });
@@ -605,20 +609,20 @@ export class BattleController {
         case 'stun':
           this.later(delay, () => {
             this.pushFx(e.target, 'stun', 'Stunned!');
-            this.pushVfx({ kind: 'stun', side: e.target, color: '#ffe45c', duration: Math.max(700, Math.min(1600, e.durationMs)) });
+            this.pushVfx({ kind: 'stun', side: e.target, color: '#ffe45c', by: (1 - e.target) as PlayerIndex, duration: Math.max(700, Math.min(1600, e.durationMs)) });
             audio.play('stun', { volume: e.target === 0 ? 1 : 0.7 });
           });
           break;
         case 'empower':
           this.later(delay, () => {
             this.pushFx(e.target, 'status', `Empowered x${e.mult}`);
-            this.pushVfx({ kind: 'empower', side: e.target, color: '#ffd36b' });
+            this.pushVfx({ kind: 'empower', side: e.target, color: '#ffd36b', by: e.target });
           });
           break;
         case 'cleanse':
           this.later(delay, () => {
             this.pushFx(e.target, 'heal', 'Cleansed');
-            this.pushVfx({ kind: 'cleanse', side: e.target, color: '#e8fff4' });
+            this.pushVfx({ kind: 'cleanse', side: e.target, color: '#e8fff4', by: e.target });
           });
           break;
         case 'statusRemoved':

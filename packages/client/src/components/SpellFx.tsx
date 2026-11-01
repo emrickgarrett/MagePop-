@@ -28,6 +28,48 @@ function rand(seed: number) {
   };
 }
 
+/**
+ * How each mage's magic looks. Effects a mage causes (hits, stuns, heals, shields, buffs) use the
+ * caster's colors, particles and stun style. A mage missing from this table falls back to their
+ * palette with sparks and lightning, so new mages work before they're themed.
+ */
+type Particle = 'ember' | 'flake' | 'leaf' | 'wisp' | 'spark';
+type StunStyle = 'flames' | 'frost' | 'vines' | 'hex' | 'lightning';
+interface MageFx {
+  main: string;
+  light: string;
+  particle: Particle;
+  stun: StunStyle;
+}
+
+export const MAGE_FX: Record<string, MageFx> = {
+  ember: { main: '#ff6a2b', light: '#ffd08a', particle: 'ember', stun: 'flames' },
+  rime: { main: '#7fd4ff', light: '#e6f8ff', particle: 'flake', stun: 'frost' },
+  briar: { main: '#4cd97b', light: '#d8ffb8', particle: 'leaf', stun: 'vines' },
+  nyx: { main: '#b26bff', light: '#ff9be6', particle: 'wisp', stun: 'hex' },
+  volt: { main: '#ffe45c', light: '#c9f4ff', particle: 'spark', stun: 'lightning' },
+};
+
+function mageFx(theme: string | undefined, fallback: string): MageFx {
+  if (theme && MAGE_FX[theme]) return MAGE_FX[theme];
+  let main = fallback;
+  let light = '#ffffff';
+  try {
+    if (theme) ({ primary: main, secondary: light } = getCharacter(theme).palette);
+  } catch {
+    /* unknown id */
+  }
+  return { main, light, particle: 'spark', stun: 'lightning' };
+}
+
+const PARTICLE: Record<Particle, { cls: string; glyph?: string; size: [number, number]; spin?: boolean }> = {
+  ember: { cls: 'fx-ember', size: [4, 9] },
+  flake: { cls: 'fx-glyph frost', glyph: '❄', size: [11, 20], spin: true },
+  leaf: { cls: 'fx-leaf', size: [9, 15], spin: true },
+  wisp: { cls: 'fx-wisp', size: [8, 16] },
+  spark: { cls: 'fx-glyph sparkle', glyph: '✦', size: [9, 16] },
+};
+
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** Fade in over the first `a` of the effect, out over the last `b`. */
 const envelope = (t: number, a = 0.15, b = 0.35) => clamp01(Math.min(t / a, (1 - t) / b));
@@ -129,7 +171,8 @@ function Projectile({ v, t, from, to }: { v: Vfx; t: number; from: Rect; to: Rec
 
 // ---- impact -------------------------------------------------------------------
 
-function Impact({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
+function Impact({ v: raw, t, r }: { v: Vfx; t: number; r: Rect }) {
+  const v = { ...raw, color: mageFx(raw.theme, raw.color).main };
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2;
   const R = Math.min(r.w, r.h) * (0.28 + 0.32 * v.power);
@@ -182,14 +225,18 @@ function Impact({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
 
 // ---- board auras ----------------------------------------------------------------
 
-function BoardAura({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
+function BoardAura({ v: raw, t, r }: { v: Vfx; t: number; r: Rect }) {
+  const fx = mageFx(raw.theme, raw.color);
+  // Hazards keep their own look (ice is ice); everything else wears the caster's colors.
+  const themed = !['poison', 'burn', 'freeze', 'shatter', 'petrify'].includes(raw.kind);
+  const v = themed ? { ...raw, color: raw.kind === 'cleanse' ? fx.light : fx.main } : raw;
   const env = envelope(t);
   const rnd = rand(v.id * 104729);
   const parts: ReactNode[] = [];
   let tint: CSSProperties = {};
 
   /** Particles drifting up (dy<0) or down (dy>0) across the board. */
-  const drift = (count: number, opts: { dy: number; size: [number, number]; cls: string; glyph?: string; spin?: boolean }) => {
+  const drift = (count: number, opts: { dy: number; size: [number, number]; cls: string; glyph?: string; spin?: boolean; color?: string }) => {
     for (let i = 0; i < count; i++) {
       const x = rnd() * r.w;
       const start = rnd() * 0.45; // staggered starts
@@ -211,8 +258,8 @@ function BoardAura({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
             height: s,
             fontSize: s,
             opacity: Math.sin(u * Math.PI),
-            transform: opts.spin ? `rotate(${u * 360}deg)` : undefined,
-            '--c': v.color,
+            transform: opts.spin ? `rotate(${u * 360 + i * 47}deg)` : undefined,
+            '--c': opts.color ?? v.color,
           } as CSSProperties}
         >
           {opts.glyph}
@@ -221,15 +268,18 @@ function BoardAura({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
     }
   };
 
+  /** The caster's signature particles. */
+  const motes = (count: number, dy: number) => drift(count, { dy, ...PARTICLE[fx.particle] });
+
   switch (v.kind) {
     case 'heal':
       tint = { boxShadow: `inset 0 0 ${60 + 60 * v.power}px ${v.color}`, opacity: env * 0.9 };
-      drift(14 + Math.round(10 * v.power), { dy: -0.9, size: [12, 22], cls: 'fx-glyph heal', glyph: '+' });
-      drift(10, { dy: -0.7, size: [4, 9], cls: 'fx-dot' });
+      drift(10 + Math.round(8 * v.power), { dy: -0.9, size: [12, 22], cls: 'fx-glyph heal', glyph: '+', color: fx.light });
+      motes(12, -0.75);
       break;
     case 'cleanse':
       tint = { background: `radial-gradient(circle, ${v.color}55, transparent 70%)`, opacity: env };
-      drift(16, { dy: -0.8, size: [8, 16], cls: 'fx-glyph sparkle', glyph: '✦' });
+      motes(16, -0.8);
       break;
     case 'shield': {
       const sweep = -40 + t * 180;
@@ -239,6 +289,7 @@ function BoardAura({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
         opacity: env,
       };
       parts.push(<div key="hex" className="fx-hex" style={{ opacity: env * 0.35, '--c': v.color } as CSSProperties} />);
+      motes(8, -0.5);
       break;
     }
     case 'poison':
@@ -251,7 +302,7 @@ function BoardAura({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
       break;
     case 'empower':
       tint = { background: `linear-gradient(to top, ${v.color}66, transparent 70%)`, boxShadow: `inset 0 0 60px ${v.color}`, opacity: env };
-      drift(14, { dy: -1.0, size: [10, 18], cls: 'fx-glyph sparkle', glyph: '✦' });
+      motes(16, -1.0);
       break;
     case 'freeze': {
       const e = easeOut(clamp01(t / 0.35));
@@ -291,8 +342,166 @@ function BoardAura({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
       }
       break;
     }
-    case 'stun': {
-      tint = { background: `${v.color}22`, boxShadow: `inset 0 0 50px ${v.color}88`, opacity: env };
+    case 'stun':
+      tint = stunStyle(fx, v, t, r, env, parts, motes);
+      break;
+  }
+
+  return (
+    <div className="fx-aura" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}>
+      <div className="fx-tint" style={tint} />
+      {parts}
+    </div>
+  );
+}
+
+// ---- stuns: each mage has their own -------------------------------------------------
+
+function stunStyle(
+  fx: MageFx,
+  v: Vfx,
+  t: number,
+  r: Rect,
+  env: number,
+  parts: ReactNode[],
+  motes: (count: number, dy: number) => void,
+): CSSProperties {
+  const grow = easeOut(clamp01(t / 0.3));
+  const rnd = rand(v.id * 9173);
+  const c = fx.main;
+  switch (fx.stun) {
+    case 'frost': {
+      // Icicles grow in from the top and bottom edges while the board frosts over.
+      const n = 9;
+      for (let i = 0; i < n * 2; i++) {
+        const top = i < n;
+        const x = ((i % n) + 0.5 + (rnd() - 0.5) * 0.6) * (r.w / n);
+        const len = (0.12 + rnd() * 0.16) * r.h * grow;
+        const w = 12 + rnd() * 12;
+        parts.push(
+          <div
+            key={`ic${i}`}
+            className={`fx-icicle ${top ? 'top' : 'bottom'}`}
+            style={{ left: x - w / 2, [top ? 'top' : 'bottom']: 0, width: w, height: len, opacity: env } as CSSProperties}
+          />,
+        );
+      }
+      motes(10, 0.6);
+      return { boxShadow: `inset 0 0 ${50 + 50 * grow}px ${16 * grow}px ${fx.light}aa`, background: `${c}22`, opacity: env };
+    }
+    case 'vines': {
+      // Vines creep across from the corners, sprouting leaves.
+      const paths = [];
+      for (let i = 0; i < 4; i++) {
+        const sx = i % 2 ? r.w : 0;
+        const sy = i < 2 ? 0 : r.h;
+        const ex = r.w * (0.3 + rnd() * 0.4);
+        const ey = r.h * (0.3 + rnd() * 0.4);
+        const c1x = r.w * rnd();
+        const c1y = r.h * rnd();
+        const c2x = r.w * rnd();
+        const c2y = r.h * rnd();
+        paths.push(
+          <path
+            key={i}
+            d={`M${sx},${sy} C${c1x},${c1y} ${c2x},${c2y} ${ex},${ey}`}
+            pathLength={1}
+            strokeDasharray="1 1"
+            strokeDashoffset={1 - grow}
+          />,
+        );
+        for (let k = 1; k <= 4; k++) {
+          const u = k / 5;
+          if (u > grow) continue;
+          // Point on the cubic.
+          const m = 1 - u;
+          const px = m ** 3 * sx + 3 * m * m * u * c1x + 3 * m * u * u * c2x + u ** 3 * ex;
+          const py = m ** 3 * sy + 3 * m * m * u * c1y + 3 * m * u * u * c2y + u ** 3 * ey;
+          const sz = 12 + rnd() * 8;
+          parts.push(
+            <div
+              key={`lf${i}-${k}`}
+              className="fx-leaf"
+              style={{ left: px - sz / 2, top: py - sz / 2, width: sz, height: sz, opacity: env, transform: `rotate(${rnd() * 360}deg)`, '--c': fx.light } as CSSProperties}
+            />,
+          );
+        }
+      }
+      parts.push(
+        <svg key="vines" className="fx-vines" width={r.w} height={r.h} style={{ opacity: env, '--c': c } as CSSProperties}>
+          {paths}
+        </svg>,
+      );
+      return { background: `radial-gradient(ellipse at center, transparent 45%, ${c}33)`, opacity: env };
+    }
+    case 'hex': {
+      // A hex circle spins up over the board, trailing dark wisps.
+      const R = Math.min(r.w, r.h) * 0.36 * (0.6 + 0.4 * grow);
+      const star = (rot: number) =>
+        [0, 1, 2].map((k) => {
+          const a = rot + (k * 2 * Math.PI) / 3 - Math.PI / 2;
+          return `${r.w / 2 + Math.cos(a) * R},${r.h / 2 + Math.sin(a) * R}`;
+        });
+      parts.push(
+        <svg
+          key="hex"
+          className="fx-sigil"
+          width={r.w}
+          height={r.h}
+          style={{ opacity: env, transform: `rotate(${t * 140}deg)`, '--c': c } as CSSProperties}
+        >
+          <circle cx={r.w / 2} cy={r.h / 2} r={R * 1.12} />
+          <circle cx={r.w / 2} cy={r.h / 2} r={R * 1.22} strokeDasharray="4 8" />
+          <polygon points={star(0).join(' ')} />
+          <polygon points={star(Math.PI).join(' ')} />
+        </svg>,
+      );
+      motes(14, -0.7);
+      return { background: `radial-gradient(circle, ${c}33, rgba(10, 0, 25, 0.45) 75%)`, opacity: env };
+    }
+    case 'flames': {
+      // Dizzy ring of fireballs circling the board, flames licking up from below.
+      const n = 8;
+      const R = Math.min(r.w, r.h) * 0.32 * (0.7 + 0.3 * grow);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + t * 6;
+        const sz = (34 + 8 * Math.sin(t * 22 + i)) * (r.w / 600 + 0.5);
+        parts.push(
+          <div
+            key={`fl${i}`}
+            className="fx-orb"
+            style={{
+              left: r.w / 2 + Math.cos(a) * R - sz / 2,
+              top: r.h / 2 + Math.sin(a) * R * 0.5 - sz / 2,
+              width: sz,
+              height: sz,
+              opacity: env,
+              '--c': c,
+            } as CSSProperties}
+          />,
+        );
+      }
+      for (let i = 0; i < 12; i++) {
+        // Flame tongues along the bottom edge.
+        const w = r.w / 10;
+        const h = r.h * (0.12 + 0.1 * Math.abs(Math.sin(t * 18 + i * 1.7))) * grow;
+        parts.push(
+          <div
+            key={`tg${i}`}
+            className="fx-flame"
+            style={{ left: (i / 12) * r.w - w * 0.1, bottom: 0, width: w, height: h, opacity: env, '--c': c } as CSSProperties}
+          />,
+        );
+      }
+      motes(26, -1.0);
+      return {
+        background: `linear-gradient(to top, ${c}aa, ${c}33 45%, transparent 70%)`,
+        boxShadow: `inset 0 0 60px ${c}aa`,
+        opacity: env * (0.8 + 0.2 * Math.sin(t * 45)),
+      };
+    }
+    case 'lightning':
+    default: {
       // Fresh zigzags every 70ms for a crackling look.
       const flick = rand(v.id * 31 + Math.floor((t * v.duration) / 70));
       const bolts = [];
@@ -307,20 +516,13 @@ function BoardAura({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
         bolts.push(<polyline key={b} points={pts} />);
       }
       parts.push(
-        <svg key="bolts" className="fx-bolts" width={r.w} height={r.h} style={{ opacity: env, '--c': v.color } as CSSProperties}>
+        <svg key="bolts" className="fx-bolts" width={r.w} height={r.h} style={{ opacity: env, '--c': c } as CSSProperties}>
           {bolts}
         </svg>,
       );
-      break;
+      return { background: `${c}22`, boxShadow: `inset 0 0 50px ${c}88`, opacity: env };
     }
   }
-
-  return (
-    <div className="fx-aura" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}>
-      <div className="fx-tint" style={tint} />
-      {parts}
-    </div>
-  );
 }
 
 // ---- ultimate banner ---------------------------------------------------------------

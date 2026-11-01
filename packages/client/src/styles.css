@@ -2483,3 +2483,60 @@ small {
 .fx-ult-strip .fx-ult-text span {
   font-size: 22px;
 }
+
+/* Mage-themed particles and stuns */
+.fx-ember.big {
+  background: #fff3c4;
+  box-shadow: 0 0 10px 4px var(--c), 0 0 24px var(--c);
+}
+.fx-leaf {
+  background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 55%, #0a3d1c));
+  border-radius: 0 100% 0 100%;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.fx-wisp {
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 15%, var(--c) 40%, transparent 70%);
+  filter: blur(1.5px);
+  transform: scale(1.6);
+}
+.fx-icicle {
+  background: linear-gradient(to bottom, #ffffff, #bfeaff 45%, rgba(140, 210, 255, 0.25));
+  filter: drop-shadow(0 0 5px #bfeaff);
+}
+.fx-icicle.top {
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.fx-icicle.bottom {
+  background: linear-gradient(to top, #ffffff, #bfeaff 45%, rgba(140, 210, 255, 0.25));
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.fx-vines,
+.fx-sigil {
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+.fx-vines path {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px #062b12) drop-shadow(0 0 8px var(--c));
+}
+.fx-sigil {
+  transform-origin: center;
+}
+.fx-sigil circle,
+.fx-sigil polygon {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px var(--c)) drop-shadow(0 0 14px var(--c));
+}
+.fx-flame {
+  border-radius: 50% 50% 20% 20% / 80% 80% 20% 20%;
+  background: linear-gradient(to top, #fff3c4, var(--c) 45%, transparent);
+  filter: blur(2px);
+  mix-blend-mode: screen;
+}
