@@ -1,4 +1,4 @@
-import { AI_LEVELS, chapterId, chapterOpen, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryNode } from '@magepop/core';
+import { AI_LEVELS, chapterId, chapterOpen, CHARACTERS, getCharacter, STORY, StoryChapter, StoryNode } from '@magepop/core';
 import { achievementScore } from '../game/achievements';
 import { HowToPlay } from '../components/HowToPlay';
 import { UpdateBanner } from '../components/UpdateBanner';
@@ -519,53 +519,6 @@ export function SettingsScreen({
         </section>
       </div>
     </ScreenFrame>
-  );
-}
-
-export function DialogueScreen({ lines, onDone, title, theme }: { lines: DialogueLine[]; onDone: () => void; title?: string; theme?: string }) {
-  const [i, setI] = useState(0);
-  const line = lines[i];
-  const next = () => (i + 1 >= lines.length ? onDone() : setI(i + 1));
-  const speaker = line.speaker === 'narrator' ? null : getCharacter(line.speaker);
-  return (
-    <div className="screen dialogue-screen" onClick={next}>
-      {title && <div className="dialogue-title">{title}</div>}
-      <div className="dialogue-stage">
-        {speaker ? (
-          <Portrait ch={speaker} size={220} />
-        ) : line.gem ? (
-          <div className="stage-gem" key={line.gem}>
-            <Gem kind={line.gem} size={190} theme={theme} />
-          </div>
-        ) : (
-          <div className="logo-gems stage-row">
-            {(['ruby', 'sapphire', 'emerald', 'topaz', 'amethyst'] as const).map((k, j) => (
-              <span key={k} style={{ animationDelay: `${j * 0.15}s` }}>
-                <Gem kind={k} size={90} />
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className={`dialogue-box ${speaker ? '' : 'narrator'}`} style={speaker ? ({ '--accent': speaker.palette.primary } as React.CSSProperties) : undefined}>
-        <div className="speaker">{speaker ? `${speaker.name} ${speaker.title}` : 'Guide'}</div>
-        <p>{line.text}</p>
-        <div className="dialogue-nav">
-          <span className="muted">
-            {i + 1}/{lines.length} · click to continue
-          </span>
-          <button
-            className="btn small ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDone();
-            }}
-          >
-            Skip
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 

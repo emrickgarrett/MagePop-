@@ -1,10 +1,55 @@
 import { BattleRules, GemColor } from '../types';
 
+/** A mage's face for a line (each has a portrait per expression; neutral is their main portrait). */
+export type Expression = 'neutral' | 'happy' | 'angry' | 'surprised' | 'sad';
+export const EXPRESSIONS: readonly Expression[] = ['neutral', 'happy', 'angry', 'surprised', 'sad'];
+
+/** Location backgrounds for story scenes (assets/scenes/<id>.jpg). */
+export const SCENE_LOCATIONS = [
+  'gate',
+  'arena',
+  'heartstone-hall',
+  'fountain',
+  'greenhouse',
+  'grove',
+  'library',
+  'catacombs',
+  'dorm',
+  'observatory',
+  'stairway',
+  'gray-garden',
+  'heartstone',
+] as const;
+export type SceneLocation = (typeof SCENE_LOCATIONS)[number];
+
+/**
+ * One line of a visual-novel scene.
+ * speaker: a mage id, 'narrator' (storybook voice), 'guide' (gameplay tip, gold box) or 'hero'
+ * (the mage the player is using; for "pick any mage" chapters, see heroText).
+ */
 export interface DialogueLine {
-  speaker: string; // character id or 'narrator'
+  speaker: string;
   text: string;
-  /** Gem to show while the guide explains a spell. */
+  /** Gem to show with a guide tip. */
   gem?: GemColor;
+  /** The speaker's face (default neutral). */
+  expr?: Expression;
+  /** Change the background from this line on. */
+  bg?: SceneLocation;
+  /** A staging beat when the line appears. */
+  fx?: 'shake' | 'flash' | 'flicker';
+  /** Stage side for the speaker (default: the hero on the left, everyone else on the right). */
+  side?: 'left' | 'right';
+  /** Shown as a gray, glitching Echo copy. */
+  echo?: boolean;
+  /** Portrait variant: the Hollow's hood-down face. */
+  revealed?: boolean;
+  /** Name plate override (e.g. '???' for a hidden identity). */
+  name?: string;
+  /** A voice from offstage: name plate only, nobody moves on stage. */
+  offstage?: boolean;
+  /** speaker 'hero': what each mage says (falls back to text). */
+  heroText?: Record<string, string>;
 }
 
 /** What happened in a fight, for star goals. */

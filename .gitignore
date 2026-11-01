@@ -14,3 +14,7 @@ art/wip/
 # GameDeveloperHarness working files (the art/ folder doubles as a harness workspace)
 art/chat-history.json
 art/workspace.json
+
+# Raw harness output (big PNG/JPG sources). The processed, smaller copies under
+# packages/client/public/assets/ are what ships; files already tracked here stay tracked.
+art/assets/sprites/*

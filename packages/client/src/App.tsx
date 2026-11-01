@@ -30,7 +30,8 @@ import { NetBattleController, pvp } from './game/pvp';
 import { AchievementsScreen, AchievementToasts, Toast, toastsFor } from './screens/Achievements';
 import { evaluateAchievements } from './game/achievements';
 import { MatchHistory } from './screens/MatchHistory';
-import { CharacterSelect, Collection, DialogueScreen, MainMenu, ResultInfo, ResultScreen, SettingsScreen, StoryMap } from './screens/Menus';
+import { CharacterSelect, Collection, MainMenu, ResultInfo, ResultScreen, SettingsScreen, StoryMap } from './screens/Menus';
+import { StoryScene } from './screens/StoryScene';
 
 type Screen =
   | { name: 'menu' }
@@ -236,7 +237,7 @@ export function App() {
       });
     const skip = saveRef.current.settings.skipReplayDialogue && saveRef.current.storyCleared.includes(node.id);
     if (skip || !node.outro.length) showResult();
-    else setScreen({ name: 'dialogue', lines: node.outro, then: showResult, music: 'victory' });
+    else setScreen({ name: 'dialogue', lines: node.outro, title: node.title, theme: chap.hero, then: showResult, music: 'victory' });
   };
 
   const playStory = (chapter: StoryChapter, node: StoryNode, rematch = false) => {
@@ -659,7 +660,7 @@ export function App() {
           />
         );
       case 'dialogue':
-        return <DialogueScreen key={screen.lines[0]?.text} lines={screen.lines} title={screen.title} theme={screen.theme} onDone={screen.then} />;
+        return <StoryScene key={screen.lines[0]?.text} lines={screen.lines} hero={screen.theme ?? 'ember'} title={screen.title} onDone={screen.then} />;
       case 'battle':
         return (
           <BattleScreen

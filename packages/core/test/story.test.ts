@@ -4,6 +4,8 @@ import {
   CHARACTER_BY_ID,
   chapterComplete,
   chapterOpen,
+  EXPRESSIONS,
+  SCENE_LOCATIONS,
   findValidMoves,
   createBattle,
   findGroups,
@@ -113,5 +115,33 @@ describe('finale and the Hollow', () => {
       broke = b.cells.filter((g) => g?.hollowOf).length < before;
     }
     expect(broke).toBe(true);
+  });
+});
+
+describe('story script (visual novel scenes)', () => {
+  const speakers = new Set(['narrator', 'guide', 'hero', ...Object.keys(CHARACTER_BY_ID)]);
+  const lines = STORY.flatMap((c) => c.nodes.flatMap((n) => [...n.intro, ...n.outro].map((l) => ({ l, id: n.id }))));
+
+  it('every node has a scene that opens on a background', () => {
+    for (const c of STORY)
+      for (const n of c.nodes) {
+        expect(n.intro.length, n.id).toBeGreaterThan(0);
+        expect(n.intro[0].bg, `${n.id} intro needs a background`).toBeDefined();
+        if (n.outro.length) expect(n.outro[0].bg, `${n.id} outro needs a background`).toBeDefined();
+      }
+  });
+
+  it('uses real speakers, expressions and locations', () => {
+    for (const { l, id } of lines) {
+      expect(speakers.has(l.speaker), `${id}: ${l.speaker}`).toBe(true);
+      if (l.expr) expect(EXPRESSIONS, id).toContain(l.expr);
+      if (l.bg) expect(SCENE_LOCATIONS, id).toContain(l.bg);
+      expect(l.text.length, id).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives every mage a line wherever the player picks the hero', () => {
+    for (const { l, id } of lines.filter(({ l }) => l.speaker === 'hero'))
+      for (const m of Object.keys(CHARACTER_BY_ID)) expect(l.heroText?.[m], `${id}: ${m}`).toBeTruthy();
   });
 });
