@@ -56,6 +56,7 @@ export function PuzzleScreen({
   hero,
   stages,
   settings,
+  board,
   onDone,
   onQuit,
 }: {
@@ -63,6 +64,8 @@ export function PuzzleScreen({
   hero: string;
   stages: PuzzleStage[];
   settings: Settings;
+  /** Board background theme (star reward pick, or the hero's own). */
+  board?: string;
   /** Finished every stage. */
   onDone: (r: { hintsUsed: number }) => void;
   onQuit: () => void;
@@ -149,7 +152,7 @@ export function PuzzleScreen({
           <div
             ref={boardRef}
             className={`board-wrap themed ${ctrl.canAct() ? 'ready' : ''}`}
-            style={{ '--accent': ch.palette.primary, backgroundImage: themedBoardSrc(hero) ? `url(${themedBoardSrc(hero)})` : undefined } as React.CSSProperties}
+            style={{ '--accent': ch.palette.primary, backgroundImage: themedBoardSrc(board ?? hero) ? `url(${themedBoardSrc(board ?? hero)})` : undefined } as React.CSSProperties}
           >
             <BoardView
               theme={hero}

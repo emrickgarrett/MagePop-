@@ -17,8 +17,11 @@ import {
   SaveData,
   Settings,
   storyHeroFor,
+  storyStarsEarned,
   writeSave,
 } from './game/save';
+import { equippedFrame, myBoardTheme, rewardsBetween } from './game/rewards';
+import { RewardsScreen } from './screens/Rewards';
 import { BattleScreen } from './screens/BattleScreen';
 import { PuzzleScreen } from './screens/PuzzleScreen';
 import { FriendRematch, MultiplayerLobby } from './screens/Multiplayer';
@@ -32,6 +35,7 @@ import { CharacterSelect, Collection, DialogueScreen, MainMenu, ResultInfo, Resu
 type Screen =
   | { name: 'menu' }
   | { name: 'story' }
+  | { name: 'rewards' }
   | { name: 'collection' }
   | { name: 'pvp'; autoQueue?: boolean }
   | { name: 'settings' }
@@ -79,6 +83,7 @@ function musicFor(s: Screen): MusicTrack {
     case 'dialogue':
       return s.music ?? 'story';
     case 'story':
+    case 'rewards':
     case 'puzzle':
       return 'story';
     case 'result':
@@ -184,7 +189,9 @@ export function App() {
   // ---- Story --------------------------------------------------------------
   /** After a story node: save stars, show the result, offer the next node. */
   const finishNode = (chap: StoryChapter, node: StoryNode, res: { stars: number; timeMs: number | null; goals: { text: string; ok: boolean }[] }, r?: BattleResult) => {
+    const starsBefore = storyStarsEarned(saveRef.current);
     const { save: s2, unlocked, newBest } = clearStoryNode(saveRef.current, node.id, res.timeMs, res.goals.map((g) => g.ok));
+    const newRewards = rewardsBetween(starsBefore, storyStarsEarned(s2));
     setSave(s2);
     const idx = chap.nodes.indexOf(node);
     // Next required node in this chapter (challenges are optional, so skip past them).
@@ -205,6 +212,14 @@ export function App() {
             (newBest && res.timeMs !== null ? ` · New best time ${formatTime(res.timeMs)}!` : ''),
           unlocked,
           stars: { earned: res.stars, goals: res.goals },
+          extra: newRewards.length ? (
+            <div className="result-rewards">
+              ★ New star reward{newRewards.length > 1 ? 's' : ''}: <b>{newRewards.map((x) => x.name).join(', ')}</b>.{' '}
+              <button className="btn small ghost" onClick={() => setScreen({ name: 'rewards' })}>
+                Equip
+              </button>
+            </div>
+          ) : undefined,
           stats: r ? statsOf(r) : [],
           actions: [
             ...(nextNode ? [{ label: `Next: ${nextNode.title}`, primary: true, onClick: () => playStory(chap, nextNode) }] : []),
@@ -535,6 +550,18 @@ export function App() {
     switch (screen.name) {
       case 'achievements':
         return <AchievementsScreen save={save} onBack={menu} />;
+      case 'rewards':
+        return (
+          <RewardsScreen
+            save={save}
+            onBack={() => setScreen({ name: 'story' })}
+            onEquip={(patch) => {
+              const s2 = { ...saveRef.current, settings: { ...saveRef.current.settings, ...patch } };
+              writeSave(s2);
+              setSave(s2);
+            }}
+          />
+        );
       case 'menu':
         return (
           <MainMenu
@@ -557,6 +584,7 @@ export function App() {
               writeSave(s2);
               setSave(s2);
             }}
+            onRewards={() => setScreen({ name: 'rewards' })}
             onHero={(id) => {
               const s2 = { ...saveRef.current, settings: { ...saveRef.current.settings, storyHero: id } };
               writeSave(s2);
@@ -572,6 +600,7 @@ export function App() {
             hero={screen.hero}
             stages={LESSONS[screen.lesson]}
             settings={save.settings}
+            board={myBoardTheme(save, screen.hero)}
             onDone={screen.onDone}
             onQuit={() => setScreen({ name: 'story' })}
           />
@@ -636,6 +665,7 @@ export function App() {
             firstBattle={!save.seenHowToPlay && screen.mode !== 'pvp'}
             makeController={screen.makeController}
             opponentTag={screen.opponentName ?? screen.opponentTag}
+            cosmetics={{ frame: equippedFrame(save), board: myBoardTheme(save, screen.setup.player) }}
             onGuideSeen={() => {
               const s2 = { ...saveRef.current, seenHowToPlay: true };
               writeSave(s2);

@@ -143,7 +143,7 @@ function goalMet(save: SaveData, nodeId: string, i: number): boolean {
   return n >= 3 || (i === 0 && save.storyCleared.includes(nodeId));
 }
 
-function Stars({ n, size = 16 }: { n: number; size?: number }) {
+export function Stars({ n, size = 16 }: { n: number; size?: number }) {
   return (
     <span className="stars" style={{ fontSize: size }}>
       {[0, 1, 2].map((i) => (
@@ -161,6 +161,7 @@ export function StoryMap({
   onPlay,
   onDifficulty,
   onHero,
+  onRewards,
 }: {
   save: SaveData;
   onBack: () => void;
@@ -168,6 +169,7 @@ export function StoryMap({
   onDifficulty: (d: StoryDifficulty) => void;
   /** Pick the mage for "any mage" chapters (the finale). */
   onHero: (id: string) => void;
+  onRewards: () => void;
 }) {
   const difficulty = save.settings.storyDifficulty ?? 'normal';
   const next = nextStoryNode(save);
@@ -189,7 +191,15 @@ export function StoryMap({
   };
 
   return (
-    <ScreenFrame title="Story" onBack={onBack}>
+    <ScreenFrame
+      title="Story"
+      onBack={onBack}
+      right={
+        <button className="btn small ghost" onClick={onRewards}>
+          ★ Star Rewards
+        </button>
+      }
+    >
       <div className="story-summary">
         <div className="ss-progress">
           <div className="ss-label">
@@ -681,7 +691,14 @@ export function Collection({ save, onBack, onHistory }: { save: SaveData; onBack
           ) : (
             <div className="locked-detail">
               <Portrait ch={ch} size={110} locked />
-              <p>Locked. Clear {getCharacter(STORY.find((s) => s.unlocks === ch.id)?.hero ?? 'ember').name}'s story chapter to recruit this mage.</p>
+              <p>
+                {(() => {
+                  const via = STORY.find((s) => s.unlocks === ch.id);
+                  return via?.anyHero
+                    ? `Locked. Beat the story Finale, ${via.title}, to recruit this mage.`
+                    : `Locked. Clear ${getCharacter(via?.hero ?? 'ember').name}'s story chapter to recruit this mage.`;
+                })()}
+              </p>
             </div>
           )}
         </div>
@@ -765,7 +782,7 @@ export function ResultScreen({ info }: { info: ResultInfo }) {
             <h3>
               {getCharacter(info.unlocked).name} {getCharacter(info.unlocked).title}
             </h3>
-            <div>Their story chapter is now open.</div>
+            <div>{STORY.some((c) => c.hero === info.unlocked && !c.anyHero) ? 'Their story chapter is now open.' : 'Pick them in any mode from now on.'}</div>
           </div>
         </div>
       )}

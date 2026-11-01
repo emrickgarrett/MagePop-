@@ -3,9 +3,9 @@ import { forwardRef, useState } from 'react';
 import type { FloatFx } from '../game/BattleController';
 import { Gem } from './Gem';
 
-export function Portrait({ ch, size = 96, locked = false }: { ch: CharacterDef; size?: number; locked?: boolean }) {
+export function Portrait({ ch, size = 96, locked = false, frame }: { ch: CharacterDef; size?: number; locked?: boolean; frame?: string | null }) {
   const [imgOk, setImgOk] = useState(true);
-  return (
+  const inner = (
     <div
       className={`portrait ${locked ? 'locked' : ''}`}
       style={{
@@ -19,6 +19,13 @@ export function Portrait({ ch, size = 96, locked = false }: { ch: CharacterDef; 
         <img src={`assets/portraits/${ch.id}.png`} alt="" onError={() => setImgOk(false)} draggable={false} />
       )}
       {(!imgOk || locked) && <span style={{ fontSize: size * 0.5 }}>{locked ? '?' : ch.sigil}</span>}
+    </div>
+  );
+  // Star reward frame: a ring drawn outside the portrait (the portrait itself clips its contents).
+  if (!frame || locked) return inner;
+  return (
+    <div className={`portrait-frame frame-${frame}`} style={{ width: size, height: size }}>
+      {inner}
     </div>
   );
 }
@@ -39,6 +46,7 @@ export function PlayerPanel({
   tag,
   mysteryName,
   ally,
+  frame,
 }: {
   ch: CharacterDef;
   pl: PlayerState;
@@ -53,6 +61,8 @@ export function PlayerPanel({
   mysteryName?: string;
   /** Story (protect): the ally you're keeping alive. */
   ally?: { name: string; hp: number; maxHp: number };
+  /** Star reward portrait frame (your own side only). */
+  frame?: string | null;
 }) {
   const pct = (vitals.hp / vitals.maxHp) * 100;
   const shieldPct = Math.min(100, (vitals.shield / vitals.maxHp) * 100);
@@ -69,7 +79,7 @@ export function PlayerPanel({
   return (
     <div className={`player-panel side-${side} ${shakeAge < 300 ? 'shake' : ''}`}>
       {flash && flash.age < 600 && <div className="cast-flash" style={{ background: flash.color }} />}
-      <Portrait ch={ch} size={side === 0 ? 84 : 72} locked={!!mysteryName} />
+      <Portrait ch={ch} size={side === 0 ? 84 : 72} locked={!!mysteryName} frame={frame} />
       <div className="pp-main">
         <div className="pp-name">
           <span className="pp-tag">{tag}</span>

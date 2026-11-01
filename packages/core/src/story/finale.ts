@@ -14,7 +14,7 @@ export const FINALE_CHAPTER: StoryChapter = {
   requires: 'volt',
   cover: 'hollow',
   title: 'The Hollow',
-  unlocks: null,
+  unlocks: 'hollow',
   nodes: [
     {
       kind: 'gauntlet',
@@ -139,8 +139,9 @@ export const FINALE_CHAPTER: StoryChapter = {
         { speaker: 'nyx', text: 'And frankly, anyone who framed ME this well belongs at the Academy.' },
         { speaker: 'volt', text: 'Rematch tomorrow? Fair fight. Bring your weird gray gems.' },
         { speaker: 'ember', text: 'The Academy has room for one more. If you want it.' },
-        { speaker: 'hollow', text: '...I will think about it.' },
-        { speaker: N, text: 'The Heartstone is whole again. The Fracture is closed. Thanks for playing The Fracture!' },
+        { speaker: 'hollow', text: '...Fine. But I am keeping the gray gems.' },
+        { speaker: N, text: 'The Heartstone is whole again. The Fracture is closed, and the Academy has a sixth student.' },
+        { speaker: N, text: 'The Hollow has joined your mages! Thanks for playing The Fracture.' },
       ],
     },
   ],

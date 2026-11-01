@@ -21,6 +21,9 @@ export interface Settings {
   pvpMage: string | null;
   /** Mage picked for "any mage" story chapters (the finale). */
   storyHero: string | null;
+  /** Star reward cosmetics (see rewards.ts). null = none / your mage's own board. */
+  frame: string | null;
+  boardSkin: string | null;
   /** 0..1 */
   musicVolume: number;
   /** 0..1 */
@@ -131,6 +134,8 @@ export const DEFAULT_SETTINGS: Settings = {
   playerName: '',
   pvpMage: null,
   storyHero: null,
+  frame: null,
+  boardSkin: null,
   musicVolume: 0.6,
   sfxVolume: 0.8,
 };

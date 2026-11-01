@@ -3519,3 +3519,142 @@ small {
 .story-summary {
   gap: 14px;
 }
+
+/* ---- Star reward portrait frames -------------------------------------------------- */
+.portrait-frame {
+  position: relative;
+  flex: none;
+  border-radius: 50%;
+}
+.portrait-frame::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  padding: 4px;
+  background: var(--ring);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  box-shadow: 0 0 12px var(--ring-glow, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+.portrait-frame::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  box-shadow: 0 0 14px var(--ring-glow, transparent);
+  pointer-events: none;
+}
+.frame-bronze {
+  --ring: linear-gradient(140deg, #f3c08a, #a8652b 45%, #e8a86a 70%, #6e3c14);
+  --ring-glow: #c98a4d55;
+}
+.frame-silver {
+  --ring: linear-gradient(140deg, #ffffff, #9aa4b8 45%, #e9eef7 70%, #5f6778);
+  --ring-glow: #cfd8ea66;
+}
+.frame-gold {
+  --ring: linear-gradient(140deg, #fff3b0, #e0a823 40%, #ffe27a 65%, #9a6a08);
+  --ring-glow: #ffd45c88;
+}
+.frame-prismatic {
+  --ring: conic-gradient(from var(--prism-angle, 0deg), #ff5a6e, #ffb347, #ffe45c, #4cd97b, #5cc8ff, #b26bff, #ff5a6e);
+  --ring-glow: #ffffff66;
+  animation: prism-spin 4s linear infinite;
+}
+@property --prism-angle {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+@keyframes prism-spin {
+  to {
+    --prism-angle: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .frame-prismatic {
+    animation: none;
+  }
+}
+
+/* ---- Star rewards screen ---------------------------------------------------------- */
+.rewards {
+  display: grid;
+  gap: 18px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+.rewards-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+}
+.rewards-head .rh-stars {
+  font-family: var(--display);
+  font-size: 30px;
+}
+.rewards-head .rh-next {
+  flex: 1;
+}
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+.reward-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 12px 14px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  text-align: center;
+}
+.reward-card.equipped {
+  border-color: var(--gold, #ffd45c);
+  box-shadow: 0 0 0 1px var(--gold, #ffd45c) inset;
+}
+.reward-card.locked {
+  opacity: 0.55;
+}
+.reward-card .rc-need {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.reward-preview {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+}
+.reward-board {
+  width: 120px;
+  height: 96px;
+  border-radius: 12px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+.reward-card.locked .reward-board,
+.reward-card.locked .reward-preview {
+  filter: grayscale(0.85) brightness(0.6);
+}
+.result-rewards {
+  margin-top: 6px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(255, 212, 92, 0.12);
+  border: 1px solid rgba(255, 212, 92, 0.45);
+}

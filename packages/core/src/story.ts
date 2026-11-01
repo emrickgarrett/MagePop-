@@ -81,8 +81,11 @@ const FLAVOR: Record<string, { title: string; lines: [string, string, string][] 
   },
 };
 
+/** Mages recruited by something other than their own chapter (the Hollow joins after the finale). */
+const NO_CHAPTER = new Set(['hollow']);
+
 function chapterOrder(): string[] {
-  return CHARACTERS.map((c) => c.id);
+  return CHARACTERS.map((c) => c.id).filter((id) => !NO_CHAPTER.has(id));
 }
 
 /** Spells taught per fight: fight 1 teaches 2 colors, fight 2 two more, fight 3 the last one. */

@@ -62,6 +62,7 @@ export function BattleScreen({
   onGuideSeen,
   makeController,
   opponentTag,
+  cosmetics,
   onEnd,
   onQuit,
 }: {
@@ -76,6 +77,8 @@ export function BattleScreen({
   makeController?: (onEnd: (r: BattleResult) => void) => BattleController;
   /** Label on the opponent's panel (default: bot difficulty). */
   opponentTag?: string;
+  /** Star reward cosmetics for your side: portrait frame and board background. */
+  cosmetics?: { frame: string | null; board: string | null };
   onEnd: (r: BattleResult) => void;
   /** Forfeit from the pause menu (counts as a loss). */
   onQuit: (r: BattleResult) => void;
@@ -203,6 +206,7 @@ export function BattleScreen({
             time={s.time}
             side={0}
             tag="YOU"
+            frame={cosmetics?.frame}
             ally={s.ally && s.rules?.protect ? { name: s.rules.protect.name, hp: s.ally.hp, maxHp: s.ally.maxHp } : undefined}
           />
           {chatOn && (
@@ -211,7 +215,7 @@ export function BattleScreen({
               <ChatMenu onPick={chat.send} />
             </>
           )}
-          <div ref={myBoard} className={`board-wrap themed ${canAct ? 'ready' : ''}`} style={boardStyle(me.ch.id, me.ch.palette.primary)}>
+          <div ref={myBoard} className={`board-wrap themed ${canAct ? 'ready' : ''}`} style={boardStyle(cosmetics?.board ?? me.ch.id, me.ch.palette.primary)}>
             <BoardView
               theme={me.ch.id}
               frame={ctrl.display[0].frame}

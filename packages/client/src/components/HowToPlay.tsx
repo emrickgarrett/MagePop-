@@ -70,7 +70,7 @@ export function HowToPlay({ onClose, theme = 'ember' }: { onClose: () => void; t
       body: (
         <>
           You both play at the same time on your own boards. Drop their HP to zero to win. Watch out for their spells: <b>frozen</b> gems
-          can't be swapped, <b>stone</b> breaks when you match next to it, <b>poison and burn</b> tick until you make enough matches, and a{' '}
+          can't be swapped, <b>stone</b> and gray <b>hollow</b> gems break when you match next to them, <b>poison and burn</b> tick until you make enough matches, and a{' '}
           <b>stun</b> locks your board for a moment.
         </>
       ),

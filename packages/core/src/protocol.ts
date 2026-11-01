@@ -10,7 +10,8 @@
 import { CHARACTER_BY_ID, isPlayableCharacter } from './characters';
 import { BattleEvent, BattleState, Board, BoardStep, PlayerIndex, PlayerState, Pos } from './types';
 
-export const PROTOCOL_VERSION = 2;
+// 3: the Hollow joined the roster (older clients can't render her).
+export const PROTOCOL_VERSION = 3;
 
 export const LIMITS = {
   /** Longest display name, after cleanup. */

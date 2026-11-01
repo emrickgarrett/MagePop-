@@ -83,10 +83,11 @@ describe('finale and the Hollow', () => {
     expect(nodeAvailable(finale, 1, voltDone, ['rime'])).toBe(false);
   });
 
-  it('the Hollow is story-only: not pickable online', () => {
+  it('beating the finale recruits the Hollow, who is then a normal playable mage', () => {
+    expect(finale.unlocks).toBe('hollow');
     expect(CHARACTER_BY_ID.hollow).toBeDefined();
-    expect(isCharacterId('hollow')).toBe(false);
-    expect(parseClientMessage(JSON.stringify({ t: 'queue', characterId: 'hollow' }))).toBeNull();
+    expect(isCharacterId('hollow')).toBe(true);
+    expect(parseClientMessage(JSON.stringify({ t: 'queue', characterId: 'hollow' }))).toEqual({ t: 'queue', characterId: 'hollow' });
   });
 
   it('hollow gems keep their color, can\'t be matched, and break when matched next to', () => {
