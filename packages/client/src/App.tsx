@@ -67,8 +67,8 @@ type Screen =
   | { name: 'result'; info: ResultInfo }
   | { name: 'puzzle'; title: string; hero: string; lesson: string; onDone: (r: { hintsUsed: number }) => void };
 
-/** Each mage's battle music; mages without a track yet (the Hollow) borrow the Endless theme. */
-const THEMED_MUSIC = new Set(['ember', 'rime', 'briar', 'nyx', 'volt']);
+/** Each mage's battle music; a mage without a track yet borrows the Endless theme. */
+const THEMED_MUSIC = new Set(['ember', 'rime', 'briar', 'nyx', 'volt', 'hollow']);
 const battleTheme = (championId: string): MusicTrack => (THEMED_MUSIC.has(championId) ? (`battle-${championId}` as MusicTrack) : 'endless');
 
 /** Which music each screen plays. */
@@ -300,7 +300,8 @@ export function App() {
           detail: node.title,
           opponentTag: fightNode?.mystery ? '???' : w.echo ? 'ECHO' : undefined,
           spotlight: node.spotlight,
-          music: battleTheme(node.kind === 'boss' ? w.opponent : chap.hero),
+          // Bosses play their own theme, and so does every fight against the Hollow (her theme is the tell).
+          music: battleTheme(node.kind === 'boss' || w.opponent === 'hollow' ? w.opponent : chap.hero),
           onEnd: (r) => {
             if (!r.won) return lose(r, w);
             const me = r.state.players[0];

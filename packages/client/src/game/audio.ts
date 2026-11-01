@@ -16,7 +16,8 @@ export type MusicTrack =
   | 'battle-rime'
   | 'battle-briar'
   | 'battle-nyx'
-  | 'battle-volt';
+  | 'battle-volt'
+  | 'battle-hollow';
 
 interface TrackInfo {
   /** Measured integrated loudness (LUFS); used to level every track to the same volume. */
@@ -39,6 +40,8 @@ const TRACKS: Record<MusicTrack, TrackInfo> = {
   'battle-briar': { lufs: -15.1, loop: true, loopEnd: 149 },
   'battle-nyx': { lufs: -15.63, loop: true, loopEnd: 149 },
   'battle-volt': { lufs: -15.6, loop: true, loopEnd: 176 },
+  // Quiet music-box intro plays once; the loop returns to where the drums come in.
+  'battle-hollow': { lufs: -15.5, loop: true, loopStart: 6, loopEnd: 205 },
 };
 
 const TARGET_LUFS = -16;
