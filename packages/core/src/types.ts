@@ -136,6 +136,75 @@ export interface BattleState {
   players: [PlayerState, PlayerState];
   over: boolean;
   winner: PlayerIndex | null;
+  /** Story encounter rules (absent for normal battles and online play). */
+  rules?: BattleRules;
+  /** Current boss phase (0 = first). */
+  phase?: number;
+  /** When each rules.pulses entry fires next (battle time, ms). */
+  pulseNext?: number[];
+}
+
+// ---------------------------------------------------------------------------
+// Encounter rules (story mode). Plain data, so fights are tuned by editing numbers.
+// ---------------------------------------------------------------------------
+
+/** Who a rule applies to, from the player's point of view. */
+export type RuleTarget = 'player' | 'opponent' | 'both';
+
+export interface SideRules {
+  /** Healing does nothing. */
+  noHealing?: boolean;
+  /** Shields do nothing. */
+  noShields?: boolean;
+  /** Matching these colors does nothing (no spell, no damage). */
+  silenced?: GemColor[];
+  /** Multiplies how long each move keeps you busy (1.5 = 50% slower). */
+  slowMult?: number;
+}
+
+/** Something "the world" does on a timer: the Heartstone pulsing, a blight spreading... */
+export interface Pulse {
+  everyMs: number;
+  /** First firing (default: everyMs after it becomes active). */
+  firstAtMs?: number;
+  target: RuleTarget;
+  /** Effects are applied as if cast at the target (freeze, petrify, destroy, poison, stun, damage...). */
+  effects: Effect[];
+  /** Shown in the UI when it fires, e.g. "The Heartstone pulses!". */
+  label: string;
+  /** Only active from this boss phase on (default 0). */
+  fromPhase?: number;
+}
+
+export interface BossPhase {
+  /** Enters this phase when the opponent's HP falls to this percent or lower. */
+  atHpPct: number;
+  /** Applied to the opponent on entering (e.g. a heal or shield). */
+  onEnter?: Effect[];
+}
+
+export interface StartHazards {
+  target: RuleTarget;
+  stones?: number;
+  frozen?: number;
+  /** How long starting ice lasts (default 15s). */
+  frozenMs?: number;
+}
+
+export interface BattleRules {
+  /** Per-side tweaks: [player, opponent]. */
+  sides?: [SideRules | undefined, SideRules | undefined];
+  pulses?: Pulse[];
+  start?: StartHazards[];
+  /** Survival: the player wins by still being alive at this battle time. */
+  surviveMs?: number;
+  /** Boss phases for the opponent, in order of falling HP. */
+  phases?: BossPhase[];
+  /**
+   * Fixed starting layout for the player's board (puzzles): one string per row, one letter per cell:
+   * r ruby, b sapphire, g emerald, y topaz, p amethyst, s stone; uppercase = frozen.
+   */
+  layout?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -175,4 +244,12 @@ export type BattleEventBody =
   | { type: 'stun'; target: PlayerIndex; durationMs: number }
   | { type: 'empower'; target: PlayerIndex; mult: number; charges: number }
   | { type: 'cleanse'; target: PlayerIndex }
-  | { type: 'gameOver'; winner: PlayerIndex };
+  | { type: 'gameOver'; winner: PlayerIndex }
+  /** Story: a timed pulse fired (label for the UI). */
+  | { type: 'pulse'; target: RuleTarget; label: string }
+  /** Story: the boss entered a new phase. */
+  | { type: 'phase'; phase: number }
+  /** Story: a silenced color was matched and did nothing. */
+  | { type: 'silenced'; caster: PlayerIndex; color: GemColor }
+  /** Story: survival timer ran out with the player alive. */
+  | { type: 'survived' };

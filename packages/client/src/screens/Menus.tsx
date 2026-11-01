@@ -1,4 +1,4 @@
-import { AI_LEVELS, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryFight } from '@magepop/core';
+import { AI_LEVELS, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryNode } from '@magepop/core';
 import { achievementScore } from '../game/achievements';
 import { HowToPlay } from '../components/HowToPlay';
 import { UpdateBanner } from '../components/UpdateBanner';
@@ -7,7 +7,7 @@ import { Gem } from '../components/Gem';
 import { Portrait, SpellTable } from '../components/Hud';
 import { audio } from '../game/audio';
 import { isDesktop, isFullscreen, setFullscreen } from '../game/platform';
-import { fightAvailable, formatTime, mageStatsOf, nextStoryFight, TOTAL_STORY_FIGHTS } from '../game/save';
+import { formatTime, mageStatsOf, nextStoryNode, nodeOpen, storyNodesCleared, storyStarsEarned, TOTAL_STORY_NODES, TOTAL_STORY_STARS } from '../game/save';
 import type { RecordStats, SaveData, Settings } from '../game/save';
 
 export function Logo() {
@@ -33,8 +33,8 @@ export type MenuTarget = 'story' | 'quick' | 'endless' | 'pvp' | 'collection' | 
 export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTarget) => void; onQuit?: () => void }) {
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [howTo, setHowTo] = useState(false);
-  const cleared = save.storyCleared.length;
-  const next = nextStoryFight(save);
+  const cleared = storyNodesCleared(save);
+  const next = nextStoryNode(save);
   return (
     <div className="screen menu-screen">
       <UpdateBanner />
@@ -43,7 +43,7 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
         <button className="btn big" onClick={() => go('story')}>
           Story
           <small>
-            {cleared === 0 ? 'Start your journey' : next ? `${cleared}/${TOTAL_STORY_FIGHTS} fights cleared` : 'Complete! Replay any fight'}
+            {cleared === 0 ? 'Start your journey' : next ? `${cleared}/${TOTAL_STORY_NODES} steps · ★ ${storyStarsEarned(save)}` : `Complete! ★ ${storyStarsEarned(save)}/${TOTAL_STORY_STARS}`}
           </small>
         </button>
         <button className="btn big alt" onClick={() => go('quick')}>
@@ -118,6 +118,21 @@ export function ScreenFrame({ title, onBack, children, right }: { title: string;
   );
 }
 
+const NODE_ICON: Record<StoryNode['kind'], string> = { lesson: '📖', fight: '⚔️', survival: '⏳', boss: '👑' };
+const NODE_KIND: Record<StoryNode['kind'], string> = { lesson: 'Lesson', fight: 'Battle', survival: 'Survival', boss: 'Boss' };
+
+function Stars({ n, size = 16 }: { n: number; size?: number }) {
+  return (
+    <span className="stars" style={{ fontSize: size }}>
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={i < n ? 'on' : ''}>
+          ★
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function StoryMap({
   save,
   onBack,
@@ -125,106 +140,162 @@ export function StoryMap({
 }: {
   save: SaveData;
   onBack: () => void;
-  onPlay: (ch: StoryChapter, f: StoryFight) => void;
+  onPlay: (ch: StoryChapter, node: StoryNode) => void;
 }) {
-  const cleared = save.storyCleared.length;
-  const chaptersDone = STORY.filter((c) => c.fights.every((f) => save.storyCleared.includes(f.id))).length;
-  const next = nextStoryFight(save);
-  const pct = (cleared / TOTAL_STORY_FIGHTS) * 100;
+  const next = nextStoryNode(save);
+  const cleared = storyNodesCleared(save);
+  const stars = storyStarsEarned(save);
+  const [chapIdx, setChapIdx] = useState(() => Math.max(0, STORY.findIndex((c) => c === (next?.chap ?? STORY[0]))));
+  const chap = STORY[chapIdx];
+  const [nodeId, setNodeId] = useState<string>(() => next?.node.id ?? chap.nodes[0].id);
+  const nodeIdx = Math.max(0, chap.nodes.findIndex((n) => n.id === nodeId));
+  const node = chap.nodes[nodeIdx];
+  const hero = getCharacter(chap.hero);
+  const open = nodeOpen(save, chap, nodeIdx);
+  const pickChapter = (i: number) => {
+    setChapIdx(i);
+    const c = STORY[i];
+    const firstOpen = c.nodes.find((n, j) => !save.storyCleared.includes(n.id) && !n.optional && nodeOpen(save, c, j));
+    setNodeId((firstOpen ?? c.nodes[0]).id);
+  };
+
   return (
     <ScreenFrame title="Story" onBack={onBack}>
       <div className="story-summary">
         <div className="ss-progress">
           <div className="ss-label">
             <b>
-              {cleared}/{TOTAL_STORY_FIGHTS}
+              {cleared}/{TOTAL_STORY_NODES}
             </b>{' '}
-            fights cleared · <b>{chaptersDone}/{STORY.length}</b> chapters complete
-            {next && <span className="muted"> · {TOTAL_STORY_FIGHTS - cleared} to go</span>}
+            steps cleared · <Stars n={3} size={13} /> <b>{stars}</b>/{TOTAL_STORY_STARS} stars
           </div>
           <div className="ss-bar">
-            <div style={{ width: `${pct}%` }} />
+            <div style={{ width: `${(cleared / TOTAL_STORY_NODES) * 100}%` }} />
           </div>
         </div>
         {next ? (
-          <button className="btn" onClick={() => onPlay(next.chap, next.fight)}>
-            {cleared === 0 ? 'Begin' : 'Continue'}: {getCharacter(next.chap.hero).name} · {next.fight.title}
+          <button className="btn" onClick={() => onPlay(next.chap, next.node)}>
+            {cleared === 0 ? 'Begin' : 'Continue'}: {getCharacter(next.chap.hero).name} · {next.node.title}
           </button>
         ) : (
-          <div className="ss-done">Story complete! Replay any fight below.</div>
+          <div className="ss-done">Every chapter cleared! Go back for stars.</div>
         )}
       </div>
-      <div className="chapters">
-        {STORY.map((chap, ci) => {
-          const hero = getCharacter(chap.hero);
-          const unlocked = save.unlocked.includes(chap.hero);
-          const prevHero = ci > 0 ? getCharacter(STORY[ci - 1].hero).name : '';
-          const done = chap.fights.filter((f) => save.storyCleared.includes(f.id)).length;
-          const status = !unlocked ? 'locked' : done === chap.fights.length ? 'complete' : done > 0 ? 'progress' : 'new';
-          const statusText = { locked: 'Locked', complete: 'Complete', progress: 'In progress', new: 'New' }[status];
-          return (
-            <div key={chap.hero} className={`chapter ${unlocked ? '' : 'locked'}`} style={{ '--accent': hero.palette.primary } as React.CSSProperties}>
-              <Portrait ch={hero} size={88} locked={!unlocked} />
-              <div className="chapter-body">
-                <div className="chapter-num">
-                  Chapter {ci + 1}
-                  <span className={`ch-status st-${status}`}>{statusText}</span>
-                  {unlocked && (
-                    <span className="ch-count">
-                      {done}/{chap.fights.length}
-                    </span>
-                  )}
-                </div>
-                <h3>{unlocked ? `${hero.name}: ${chap.title}` : '???'}</h3>
-                <div className="muted">{unlocked ? `Play as ${hero.name} · ${hero.role}` : `Finish ${prevHero}'s chapter to unlock`}</div>
-                {unlocked && (
-                  <div className="fights">
-                    {chap.fights.map((f, fi) => {
-                      const isCleared = save.storyCleared.includes(f.id);
-                      const available = fightAvailable(save, chap, fi);
-                      const isNext = next?.fight.id === f.id;
-                      const best = save.storyBest[f.id];
-                      return (
-                        <button
-                          key={f.id}
-                          className={`fight-node ${isCleared ? 'cleared' : ''} ${f.boss ? 'boss' : ''} ${isNext ? 'next' : ''}`}
-                          disabled={!available}
-                          onClick={() => onPlay(chap, f)}
-                          title={available ? `vs ${getCharacter(f.opponent).name} (${AI_LEVELS[f.aiLevel].name})` : 'Clear the previous fight first'}
-                        >
-                          <span className="fn-title">{f.title}</span>
-                          <span className="fn-sub">
-                            vs {getCharacter(f.opponent).name} · {AI_LEVELS[f.aiLevel].name}
-                          </span>
-                          <span className="fn-state">
-                            {isCleared ? (
-                              <>
-                                <span className="fn-replay">↻ Replay</span>
-                                {best !== undefined && <span className="muted">Best {formatTime(best)}</span>}
-                              </>
-                            ) : isNext ? (
-                              <span className="fn-next">▶ Play</span>
-                            ) : (
-                              <span className="muted">🔒 Locked</span>
-                            )}
-                          </span>
-                          {isCleared && <span className="fn-check">✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              {chap.unlocks && (
-                <div className="chapter-reward">
-                  <div className="muted">Reward</div>
-                  <Portrait ch={getCharacter(chap.unlocks)} size={48} locked={!save.unlocked.includes(chap.unlocks)} />
-                  <div className="muted">{save.unlocked.includes(chap.unlocks) ? getCharacter(chap.unlocks).name : '???'}</div>
-                </div>
-              )}
+
+      <div className="story-layout">
+        <div className="chapter-list">
+          {STORY.map((c, ci) => {
+            const h = getCharacter(c.hero);
+            const unlocked = save.unlocked.includes(c.hero);
+            const req = c.nodes.filter((n) => !n.optional);
+            const done = req.filter((n) => save.storyCleared.includes(n.id)).length;
+            const st = c.nodes.reduce((t, n) => t + (save.storyStars[n.id] ?? 0), 0);
+            return (
+              <button
+                key={c.hero}
+                className={`chapter-tab ${ci === chapIdx ? 'on' : ''} ${unlocked ? '' : 'locked'}`}
+                style={{ '--accent': h.palette.primary } as React.CSSProperties}
+                onClick={() => pickChapter(ci)}
+              >
+                <Portrait ch={h} size={46} locked={!unlocked} />
+                <span className="ct-text">
+                  <small>Chapter {ci + 1}</small>
+                  <b>{unlocked ? c.title : '???'}</b>
+                  <span className="muted">
+                    {unlocked ? (
+                      <>
+                        {done}/{req.length} · ★ {st}/{c.nodes.length * 3}
+                      </>
+                    ) : (
+                      `Finish ${getCharacter(STORY[ci - 1]?.hero ?? 'ember').name}'s chapter`
+                    )}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+          <div className="chapter-tab locked finale">
+            <span className="finale-icon">?</span>
+            <span className="ct-text">
+              <small>Finale</small>
+              <b>The Hollow</b>
+              <span className="muted">Coming in a future update</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="chapter-view" style={{ '--accent': hero.palette.primary } as React.CSSProperties}>
+          <div className="cv-head">
+            <h3>
+              {hero.name}: {chap.title}
+            </h3>
+            {chap.unlocks && (
+              <span className="muted">
+                Reward: {save.unlocked.includes(chap.unlocks) ? getCharacter(chap.unlocks).name : 'a new mage'}
+              </span>
+            )}
+          </div>
+          <div className="node-path">
+            {chap.nodes.map((n, i) => {
+              const isCleared = save.storyCleared.includes(n.id);
+              const isOpen = nodeOpen(save, chap, i);
+              const isNext = next?.node.id === n.id;
+              return (
+                <button
+                  key={n.id}
+                  className={`path-node k-${n.kind} ${n.optional ? 'optional' : ''} ${isCleared ? 'cleared' : ''} ${isOpen ? '' : 'locked'} ${isNext ? 'next' : ''} ${n.id === node.id ? 'sel' : ''}`}
+                  onClick={() => setNodeId(n.id)}
+                >
+                  <span className="pn-icon">{isOpen ? NODE_ICON[n.kind] : '🔒'}</span>
+                  <span className="pn-title">{n.optional ? 'Challenge' : NODE_KIND[n.kind]}</span>
+                  {isCleared ? <Stars n={save.storyStars[n.id] ?? 1} size={12} /> : <span className="pn-gap" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="node-card">
+            <div className="nc-head">
+              <span className="nc-kind">
+                {NODE_ICON[node.kind]} {node.optional ? 'Optional challenge' : NODE_KIND[node.kind]}
+              </span>
+              {save.storyCleared.includes(node.id) && <Stars n={save.storyStars[node.id] ?? 1} size={20} />}
             </div>
-          );
-        })}
+            <h3>{node.title}</h3>
+            {node.kind === 'lesson' ? (
+              <p className="muted">A puzzle with a fixed board and a few moves. Finish without hints for 3 stars.</p>
+            ) : (
+              <>
+                <div className="nc-foe">
+                  <span className={node.echo ? 'echo-portrait' : ''}>
+                    <Portrait ch={getCharacter(node.opponent)} size={54} />
+                  </span>
+                  <div>
+                    <b>{node.echo ? `Echo of ${getCharacter(node.opponent).name}` : getCharacter(node.opponent).name}</b>
+                    <div className="muted">
+                      {AI_LEVELS[node.aiLevel].name}
+                      {node.opponentHp && node.opponentHp !== 250 ? ` · ${node.opponentHp} HP` : ''}
+                      {node.playerHp && node.playerHp !== 250 ? ` · you: ${node.playerHp} HP` : ''}
+                    </div>
+                  </div>
+                </div>
+                {node.twist && <p className="nc-twist">{node.twist}</p>}
+                <ul className="nc-goals">
+                  <li>★ {node.kind === 'survival' ? 'Survive' : 'Win'}</li>
+                  {node.goals.map((g) => (
+                    <li key={g.text}>★ {g.text}</li>
+                  ))}
+                </ul>
+                {save.storyBest[node.id] !== undefined && node.kind !== 'survival' && (
+                  <div className="muted">Best time {formatTime(save.storyBest[node.id])}</div>
+                )}
+              </>
+            )}
+            <button className="btn" disabled={!open} onClick={() => onPlay(chap, node)}>
+              {!open ? '🔒 Locked' : save.storyCleared.includes(node.id) ? '↻ Replay' : '▶ Play'}
+            </button>
+          </div>
+        </div>
       </div>
     </ScreenFrame>
   );
@@ -587,6 +658,8 @@ export interface ResultInfo {
   actions: { label: string; onClick: () => void; primary?: boolean }[];
   /** Extra live content under the buttons (e.g. friend rematch status). */
   extra?: ReactNode;
+  /** Story: stars earned and which goals were met. */
+  stars?: { earned: number; goals: { text: string; ok: boolean }[] };
 }
 
 export function ResultScreen({ info }: { info: ResultInfo }) {
@@ -618,6 +691,24 @@ export function ResultScreen({ info }: { info: ResultInfo }) {
             </h3>
             <div>Their story chapter is now open.</div>
           </div>
+        </div>
+      )}
+      {info.stars && (
+        <div className="result-stars">
+          <div className="rs-big">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className={i < info.stars!.earned ? 'on' : ''} style={{ animationDelay: `${0.25 + i * 0.22}s` }}>
+                ★
+              </span>
+            ))}
+          </div>
+          <ul>
+            {info.stars.goals.map((g) => (
+              <li key={g.text} className={g.ok ? 'ok' : ''}>
+                {g.ok ? '★' : '☆'} {g.text}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       <div className="result-stats">

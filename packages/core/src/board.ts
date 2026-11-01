@@ -49,6 +49,31 @@ function wouldMatchAt(b: Board, r: number, c: number, color: GemColor): boolean 
   return false;
 }
 
+const LAYOUT_KINDS: Record<string, CellKind> = { r: 'ruby', b: 'sapphire', g: 'emerald', y: 'topaz', p: 'amethyst', s: 'stone' };
+
+/**
+ * A board from a fixed layout (story puzzles): one string per row, one letter per cell
+ * (r b g y p = gem colors, s = stone; uppercase = frozen for `frozenMs`). Refills after the first
+ * move still come from `seed`, so a puzzle's solution should only rely on the starting gems.
+ */
+export function boardFromLayout(layout: string[], seed: number, frozenMs = 10 * 60_000): Board {
+  const rows = layout.length;
+  const cols = layout[0]?.length ?? 0;
+  if (!rows || !cols || layout.some((row) => row.length !== cols)) throw new Error('Puzzle layout rows must all be the same length');
+  const b: Board = { rows, cols, cells: new Array(rows * cols).fill(null), nextId: 1, rng: seed >>> 0 };
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ch = layout[r][c];
+      const kind = LAYOUT_KINDS[ch.toLowerCase()];
+      if (!kind) throw new Error(`Unknown puzzle cell '${ch}' at row ${r}, col ${c}`);
+      const g = newGem(b, kind);
+      if (ch !== ch.toLowerCase() && kind !== 'stone') g.frozenUntil = frozenMs;
+      setCell(b, r, c, g);
+    }
+  }
+  return b;
+}
+
 export function createBoard(seed: number, rows = BOARD_ROWS, cols = BOARD_COLS): Board {
   const b: Board = { rows, cols, cells: new Array(rows * cols).fill(null), nextId: 1, rng: seed >>> 0 };
   for (let attempt = 0; attempt < 50; attempt++) {

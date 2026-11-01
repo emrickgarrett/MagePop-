@@ -174,6 +174,9 @@ export function BattleScreen({
         <div className="battle-header">
           {header}
           {online && <PingBadge />}
+          {s.rules?.surviveMs !== undefined && !s.over && (
+            <span className="survive-timer">Survive {Math.max(0, Math.ceil((s.rules.surviveMs - s.time) / 1000))}s</span>
+          )}
         </div>
         <div className="battle-hint">{settings.battleHints ? `Drag or click gems to swap · Esc for ${online ? 'menu' : 'pause'}${chatOn ? ' · 1-8 chat' : ''}` : ''}</div>
         <button
@@ -221,9 +224,14 @@ export function BattleScreen({
           <SpellLegend ch={me.ch} spotlight={spotlight} />
         </div>
         <div className="vs">VS</div>
-        <div className="arena-side foe">
+        <div className={`arena-side foe ${setup.echo ? 'echo' : ''}`}>
           <PlayerPanel {...foe} time={s.time} side={1} tag={(opponentTag ?? setup.aiLevel.name).toUpperCase()} />
           {chatOn && <ChatBubble line={chat.theirs} side="them" now={performance.now()} />}
+          {ctrl.bark && ctrl.now - ctrl.bark.at < 3200 && (
+            <div key={ctrl.bark.at} className="chat-bubble them bark">
+              {ctrl.bark.text}
+            </div>
+          )}
           <div ref={foeBoard} className="board-wrap themed" style={boardStyle(foe.ch.id, foe.ch.palette.primary)}>
             <BoardView theme={foe.ch.id} frame={ctrl.display[1].frame} engineTime={s.time} cell={cells.small} interactive={false} stunned={foe.stunned} label="Opponent board" />
           </div>
@@ -233,6 +241,11 @@ export function BattleScreen({
         </div>
       </div>
 
+      {ctrl.banner && ctrl.now - ctrl.banner.at < 2200 && (
+        <div key={ctrl.banner.at} className="pulse-banner">
+          {ctrl.banner.text}
+        </div>
+      )}
       <SpellFxLayer vfx={settings.spellEffects ? ctrl.vfx : []} now={ctrl.now} boards={[myBoard, foeBoard]} root={rootRef} stage={stageRef} />
 
       {guide && (

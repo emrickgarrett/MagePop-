@@ -1,4 +1,4 @@
-import { STARTER_CHARACTER, STORY, StoryChapter, StoryFight } from '@magepop/core';
+import { chapterComplete, nodeAvailable, requiredNodes, STARTER_CHARACTER, STORY, StoryChapter, StoryNode } from '@magepop/core';
 
 export interface Settings {
   /** Panels shake when hit. */
@@ -86,6 +86,8 @@ export interface SaveData {
   storyCleared: string[];
   /** best (fastest) clear time per story fight, in ms */
   storyBest: Record<string, number>;
+  /** Most stars earned per story node (0-3). */
+  storyStars: Record<string, number>;
   endlessBest: { wave: number; characterId: string } | null;
   /** Has seen the How to Play guide (shown before the first battle). */
   seenHowToPlay: boolean;
@@ -121,6 +123,7 @@ const fresh = (): SaveData => ({
   unlocked: [STARTER_CHARACTER],
   storyCleared: [],
   storyBest: {},
+  storyStars: {},
   endlessBest: null,
   mageStats: {},
   seenHowToPlay: false,
@@ -139,6 +142,7 @@ export function loadSave(): SaveData {
       ...fresh(),
       ...data,
       storyBest: data.storyBest ?? {},
+      storyStars: data.storyStars ?? {},
       mageStats: data.mageStats ?? {},
       history: data.history ?? [],
       achievements: data.achievements ?? {},
@@ -169,23 +173,33 @@ export function resetProgress(current: SaveData): SaveData {
   return s;
 }
 
-/** Mark a story fight cleared; returns the newly unlocked character id, if any. */
-export function clearStoryFight(save: SaveData, fightId: string, timeMs: number): { save: SaveData; unlocked: string | null; newBest: boolean } {
-  const storyCleared = save.storyCleared.includes(fightId) ? save.storyCleared : [...save.storyCleared, fightId];
-  const prevBest = save.storyBest[fightId];
-  const newBest = prevBest === undefined || timeMs < prevBest;
-  const storyBest = newBest ? { ...save.storyBest, [fightId]: Math.round(timeMs) } : save.storyBest;
+/**
+ * Mark a story node cleared with the stars earned (best kept). Returns the newly recruited mage,
+ * if this finished a chapter.
+ */
+export function clearStoryNode(
+  save: SaveData,
+  nodeId: string,
+  timeMs: number | null,
+  stars: number,
+): { save: SaveData; unlocked: string | null; newBest: boolean; newStars: boolean } {
+  const storyCleared = save.storyCleared.includes(nodeId) ? save.storyCleared : [...save.storyCleared, nodeId];
+  const prevBest = save.storyBest[nodeId];
+  const newBest = timeMs !== null && (prevBest === undefined || timeMs < prevBest);
+  const storyBest = newBest ? { ...save.storyBest, [nodeId]: Math.round(timeMs!) } : save.storyBest;
+  const prevStars = save.storyStars[nodeId] ?? 0;
+  const storyStars = stars > prevStars ? { ...save.storyStars, [nodeId]: stars } : save.storyStars;
   let unlocked: string | null = null;
   const unlockedSet = new Set(save.unlocked);
   for (const ch of STORY) {
-    if (ch.unlocks && ch.fights.every((f) => storyCleared.includes(f.id)) && !unlockedSet.has(ch.unlocks)) {
+    if (ch.unlocks && chapterComplete(ch, storyCleared) && !unlockedSet.has(ch.unlocks)) {
       unlockedSet.add(ch.unlocks);
       unlocked = ch.unlocks;
     }
   }
-  const next = { ...save, storyCleared, storyBest, unlocked: [...unlockedSet] };
+  const next = { ...save, storyCleared, storyBest, storyStars, unlocked: [...unlockedSet] };
   writeSave(next);
-  return { save: next, unlocked, newBest: newBest && prevBest !== undefined };
+  return { save: next, unlocked, newBest: newBest && prevBest !== undefined, newStars: stars > prevStars };
 }
 
 const emptyRecord = (): RecordStats => ({ wins: 0, losses: 0, fastestWinMs: null });
@@ -241,19 +255,23 @@ export function addHistory(save: SaveData, rec: MatchRecord): SaveData {
 
 // ---- Story progress helpers ------------------------------------------------
 
-export const TOTAL_STORY_FIGHTS = STORY.reduce((n, c) => n + c.fights.length, 0);
+/** Required story nodes across all chapters (optional challenges excluded). */
+export const TOTAL_STORY_NODES = STORY.reduce((n, c) => n + requiredNodes(c).length, 0);
+export const TOTAL_STORY_STARS = STORY.reduce((n, c) => n + c.nodes.length * 3, 0);
 
-export function fightAvailable(save: SaveData, chap: StoryChapter, fi: number): boolean {
-  if (!save.unlocked.includes(chap.hero)) return false;
-  return fi === 0 || save.storyCleared.includes(chap.fights[fi - 1].id);
+export const storyNodesCleared = (save: SaveData) => STORY.reduce((n, c) => n + requiredNodes(c).filter((x) => save.storyCleared.includes(x.id)).length, 0);
+export const storyStarsEarned = (save: SaveData) => Object.values(save.storyStars).reduce((a, b) => a + b, 0);
+
+export function nodeOpen(save: SaveData, chap: StoryChapter, index: number): boolean {
+  return nodeAvailable(chap, index, save.storyCleared, save.unlocked);
 }
 
-/** The first fight the player hasn't cleared yet that they can play, if any. */
-export function nextStoryFight(save: SaveData): { chap: StoryChapter; fight: StoryFight } | null {
+/** The first required node the player hasn't cleared yet and can play, if any. */
+export function nextStoryNode(save: SaveData): { chap: StoryChapter; node: StoryNode } | null {
   for (const chap of STORY) {
-    for (let fi = 0; fi < chap.fights.length; fi++) {
-      const f = chap.fights[fi];
-      if (!save.storyCleared.includes(f.id) && fightAvailable(save, chap, fi)) return { chap, fight: f };
+    for (let i = 0; i < chap.nodes.length; i++) {
+      const n = chap.nodes[i];
+      if (!n.optional && !save.storyCleared.includes(n.id) && nodeOpen(save, chap, i)) return { chap, node: n };
     }
   }
   return null;

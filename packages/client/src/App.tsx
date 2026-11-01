@@ -1,11 +1,11 @@
-import { aiLevel, CHARACTERS, DialogueLine, getCharacter, RULES, ServerMessage, StoryChapter, StoryFight } from '@magepop/core';
+import { aiLevel, CHARACTERS, DialogueLine, FightSummary, GemColor, getCharacter, LESSONS, RULES, ServerMessage, StoryChapter, StoryNode } from '@magepop/core';
 import { useEffect, useRef, useState } from 'react';
 import { audio, MusicTrack } from './game/audio';
 import { BattleController, BattleResult, BattleSetup } from './game/BattleController';
 import { isDesktop, quitApp } from './game/platform';
 import {
   addHistory,
-  clearStoryFight,
+  clearStoryNode,
   formatTime,
   loadSave,
   MatchMode,
@@ -17,6 +17,7 @@ import {
   writeSave,
 } from './game/save';
 import { BattleScreen } from './screens/BattleScreen';
+import { PuzzleScreen } from './screens/PuzzleScreen';
 import { FriendRematch, MultiplayerLobby } from './screens/Multiplayer';
 import { ResultChat } from './components/QuickChat';
 import { NetBattleController, pvp } from './game/pvp';
@@ -52,13 +53,16 @@ type Screen =
       /** Online: the opponent's display name and a controller fed by the server. */
       opponentName?: string;
       makeController?: (onEnd: (r: BattleResult) => void) => BattleController;
-      spotlight?: StoryFight['spotlight'];
+      spotlight?: GemColor[];
+      /** Label on the opponent's panel (e.g. ECHO). */
+      opponentTag?: string;
       onEnd: (r: BattleResult) => void;
       music: MusicTrack;
     }
   | { name: 'history'; mage?: string; from?: 'collection' }
   | { name: 'achievements' }
-  | { name: 'result'; info: ResultInfo };
+  | { name: 'result'; info: ResultInfo }
+  | { name: 'puzzle'; title: string; hero: string; lesson: string; onDone: (r: { hintsUsed: number }) => void };
 
 const battleTheme = (championId: string) => `battle-${championId}` as MusicTrack;
 
@@ -70,6 +74,7 @@ function musicFor(s: Screen): MusicTrack {
     case 'dialogue':
       return s.music ?? 'story';
     case 'story':
+    case 'puzzle':
       return 'story';
     case 'result':
       return s.info.won ? 'victory' : 'defeat';
@@ -172,100 +177,123 @@ export function App() {
   }, [screen]);
 
   // ---- Story --------------------------------------------------------------
-  const playStory = (chap: StoryChapter, fight: StoryFight) => {
+  /** After a story node: save stars, show the result, offer the next node. */
+  const finishNode = (chap: StoryChapter, node: StoryNode, res: { stars: number; timeMs: number | null; goals: { text: string; ok: boolean }[] }, r?: BattleResult) => {
+    const { save: s2, unlocked, newBest } = clearStoryNode(saveRef.current, node.id, res.timeMs, res.stars);
+    setSave(s2);
+    const idx = chap.nodes.indexOf(node);
+    // Next required node in this chapter (challenges are optional, so skip past them).
+    const nextNode = chap.nodes.slice(idx + 1).find((n) => !n.optional);
+    const bossDone = node.kind === 'boss';
+    const showResult = () =>
+      setScreen({
+        name: 'result',
+        info: {
+          won: true,
+          title: node.kind === 'lesson' ? 'Lesson complete!' : node.kind === 'survival' ? 'Survived!' : 'Victory!',
+          subtitle:
+            (bossDone ? `${getCharacter(chap.hero).name}'s chapter complete` : `${node.title} cleared`) +
+            (newBest && res.timeMs !== null ? ` · New best time ${formatTime(res.timeMs)}!` : ''),
+          unlocked,
+          stars: { earned: res.stars, goals: res.goals },
+          stats: r ? statsOf(r) : [],
+          actions: [
+            ...(nextNode ? [{ label: `Next: ${nextNode.title}`, primary: true, onClick: () => playStory(chap, nextNode) }] : []),
+            { label: 'Rematch', onClick: () => playStory(chap, node, true) },
+            { label: 'Story map', primary: !nextNode, onClick: () => setScreen({ name: 'story' }) },
+          ],
+        },
+      });
+    const skip = saveRef.current.settings.skipReplayDialogue && saveRef.current.storyCleared.includes(node.id);
+    if (skip || !node.outro.length) showResult();
+    else setScreen({ name: 'dialogue', lines: node.outro, then: showResult, music: 'victory' });
+  };
+
+  const playStory = (chap: StoryChapter, node: StoryNode, rematch = false) => {
     const hero = getCharacter(chap.hero);
-    const skipDialogue = saveRef.current.settings.skipReplayDialogue && saveRef.current.storyCleared.includes(fight.id);
-    const startBattle = () =>
+    const skipDialogue = rematch || (saveRef.current.settings.skipReplayDialogue && saveRef.current.storyCleared.includes(node.id));
+
+    const start = () => {
+      if (node.kind === 'lesson') {
+        setScreen({
+          name: 'puzzle',
+          title: `${hero.name} · ${node.title}`,
+          hero: chap.hero,
+          lesson: node.lesson,
+          onDone: ({ hintsUsed }) =>
+            finishNode(chap, node, {
+              stars: hintsUsed === 0 ? 3 : 2,
+              timeMs: null,
+              goals: [
+                { text: 'Complete the lesson', ok: true },
+                { text: 'Finish every stage', ok: true },
+                { text: 'No hints', ok: hintsUsed === 0 },
+              ],
+            }),
+        });
+        return;
+      }
+      const foeName = node.echo ? `Echo of ${getCharacter(node.opponent).name}` : getCharacter(node.opponent).name;
       setScreen({
         name: 'battle',
         setup: {
           seed: newSeed(),
           player: chap.hero,
-          opponent: fight.opponent,
-          aiLevel: aiLevel(fight.aiLevel),
+          opponent: node.opponent,
+          aiLevel: aiLevel(node.aiLevel),
+          maxHp: [node.playerHp ?? RULES.maxHp, node.opponentHp ?? RULES.maxHp],
+          rules: node.rules,
+          echo: node.echo,
+          barks: node.barks,
         },
-        header: `Story · ${hero.name} · ${fight.title}`,
+        header: `Story · ${hero.name} · ${node.title}`,
         mode: 'story',
-        detail: fight.title,
-        spotlight: fight.spotlight,
-        music: battleTheme(fight.boss ? fight.opponent : chap.hero),
+        detail: node.title,
+        opponentTag: node.echo ? 'ECHO' : undefined,
+        spotlight: node.spotlight,
+        music: battleTheme(node.kind === 'boss' ? node.opponent : chap.hero),
         onEnd: (r) => {
-          if (r.won) {
-            const { save: s2, unlocked, newBest } = clearStoryFight(saveRef.current, fight.id, r.durationMs);
-            setSave(s2);
-            const nextIdx = chap.fights.indexOf(fight) + 1;
-            const nextFight = chap.fights[nextIdx];
-            const showResult = () =>
-              setScreen({
-                name: 'result',
-                info: {
-                  won: true,
-                  title: 'Victory!',
-                  subtitle:
-                    (fight.boss ? `${hero.name}'s chapter complete` : `${fight.title} cleared`) +
-                    (newBest ? ` · New best time ${formatTime(r.durationMs)}!` : ''),
-                  unlocked,
-                  stats: statsOf(r),
-                  actions: [
-                    ...(nextFight
-                      ? [
-                          {
-                            label: `Next: ${nextFight.title}`,
-                            primary: true,
-                            onClick: () => playStory(chap, nextFight),
-                          },
-                        ]
-                      : []),
-                    { label: 'Rematch', onClick: () => startBattle() },
-                    {
-                      label: 'Story map',
-                      primary: !nextFight,
-                      onClick: () => setScreen({ name: 'story' }),
-                    },
-                  ],
-                },
-              });
-            if (skipDialogue) showResult();
-            else
-              setScreen({
-                name: 'dialogue',
-                lines: fight.outro,
-                then: showResult,
-                music: 'victory',
-              });
-          } else {
+          if (!r.won) {
             setScreen({
               name: 'result',
               info: {
                 won: false,
                 title: 'Defeated',
-                subtitle: `${getCharacter(fight.opponent).name} wins this round. Check the spell list and try again!`,
+                subtitle:
+                  node.kind === 'survival'
+                    ? `The ${foeName} was too much this time. Hold out a little longer!`
+                    : `${foeName} wins this round. Check the spell list and try again!`,
                 stats: statsOf(r),
                 actions: [
-                  {
-                    label: 'Rematch',
-                    primary: true,
-                    onClick: () => startBattle(),
-                  },
-                  {
-                    label: 'Story map',
-                    onClick: () => setScreen({ name: 'story' }),
-                  },
+                  { label: 'Rematch', primary: true, onClick: () => playStory(chap, node, true) },
+                  { label: 'Story map', onClick: () => setScreen({ name: 'story' }) },
                 ],
               },
             });
+            return;
           }
+          const me = r.state.players[0];
+          const summary: FightSummary = {
+            won: true,
+            durationMs: r.durationMs,
+            hpLeft: me.hp,
+            maxHp: me.maxHp,
+            lowestHp: r.lowestHp,
+            spells: me.stats.spells,
+            ultimates: me.stats.ultimates,
+            healed: me.stats.healed,
+            damageDealt: me.stats.damageDealt,
+          };
+          const goals = [
+            { text: node.kind === 'survival' ? 'Survive' : 'Win', ok: true },
+            ...node.goals.map((g) => ({ text: g.text, ok: g.check(summary) })),
+          ];
+          finishNode(chap, node, { stars: goals.filter((g) => g.ok).length, timeMs: node.kind === 'survival' ? null : r.durationMs, goals }, r);
         },
       });
-    if (skipDialogue) startBattle();
-    else
-      setScreen({
-        name: 'dialogue',
-        lines: fight.intro,
-        title: `${hero.name} · ${fight.title}`,
-        theme: chap.hero,
-        then: startBattle,
-      });
+    };
+    if (skipDialogue) start();
+    else setScreen({ name: 'dialogue', lines: node.intro, title: `${hero.name} · ${node.title}`, theme: chap.hero, then: start });
   };
 
   // ---- Online -------------------------------------------------------------
@@ -465,7 +493,19 @@ export function App() {
           />
         );
       case 'story':
-        return <StoryMap save={save} onBack={menu} onPlay={playStory} />;
+        return <StoryMap save={save} onBack={menu} onPlay={(c, n) => playStory(c, n)} />;
+      case 'puzzle':
+        return (
+          <PuzzleScreen
+            key={screen.lesson}
+            title={screen.title}
+            hero={screen.hero}
+            stages={LESSONS[screen.lesson]}
+            settings={save.settings}
+            onDone={screen.onDone}
+            onQuit={() => setScreen({ name: 'story' })}
+          />
+        );
       case 'collection':
         return <Collection save={save} onBack={menu} onHistory={(mage) => setScreen({ name: 'history', mage, from: 'collection' })} />;
       case 'pvp':
@@ -525,7 +565,7 @@ export function App() {
             settings={save.settings}
             firstBattle={!save.seenHowToPlay && screen.mode !== 'pvp'}
             makeController={screen.makeController}
-            opponentTag={screen.opponentName}
+            opponentTag={screen.opponentName ?? screen.opponentTag}
             onGuideSeen={() => {
               const s2 = { ...saveRef.current, seenHowToPlay: true };
               writeSave(s2);

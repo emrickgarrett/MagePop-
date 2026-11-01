@@ -7,3 +7,4 @@ export * from './battle';
 export * from './ai';
 export * from './story';
 export * from './protocol';
+export * from './puzzle';

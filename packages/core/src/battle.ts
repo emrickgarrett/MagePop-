@@ -1,5 +1,6 @@
 import {
   applyGravityAndRefill,
+  boardFromLayout,
   cloneBoard,
   countStones,
   createBoard,
@@ -22,6 +23,7 @@ import { hashSeed, randInt } from './rng';
 import {
   BattleEvent,
   BattleEventBody,
+  BattleRules,
   BattleState,
   BoardStep,
   Effect,
@@ -30,6 +32,8 @@ import {
   PlayerIndex,
   PlayerState,
   Pos,
+  Pulse,
+  RuleTarget,
   Status,
 } from './types';
 
@@ -79,6 +83,8 @@ export interface BattleConfig {
   /** Starting HP (e.g. carried over in Endless mode). Defaults to max. */
   hp?: [number, number];
   maxHp?: [number, number];
+  /** Story encounter rules (mutators, pulses, phases, survival, puzzle layout). */
+  rules?: BattleRules;
 }
 
 function createPlayer(index: PlayerIndex, cfg: BattleConfig): PlayerState {
@@ -90,7 +96,10 @@ function createPlayer(index: PlayerIndex, cfg: BattleConfig): PlayerState {
     hp: Math.min(maxHp, cfg.hp?.[index] ?? maxHp),
     maxHp,
     shield: 0,
-    board: createBoard(hashSeed(cfg.seed, 'board', index)),
+    board:
+      index === 0 && cfg.rules?.layout
+        ? boardFromLayout(cfg.rules.layout, hashSeed(cfg.seed, 'board', index))
+        : createBoard(hashSeed(cfg.seed, 'board', index)),
     statuses: [],
     stunnedUntil: 0,
     busyUntil: 0,
@@ -100,8 +109,31 @@ function createPlayer(index: PlayerIndex, cfg: BattleConfig): PlayerState {
 }
 
 export function createBattle(cfg: BattleConfig): BattleState {
-  return { time: 0, players: [createPlayer(0, cfg), createPlayer(1, cfg)], over: false, winner: null };
+  const state: BattleState = { time: 0, players: [createPlayer(0, cfg), createPlayer(1, cfg)], over: false, winner: null };
+  const rules = cfg.rules;
+  if (rules) {
+    state.rules = rules;
+    state.phase = 0;
+    state.pulseNext = (rules.pulses ?? []).map((p) => ((p.fromPhase ?? 0) === 0 ? (p.firstAtMs ?? p.everyMs) : Infinity));
+    const ctx: Ctx = { state, events: [], delay: 0 };
+    for (const h of rules.start ?? []) {
+      for (const p of sidesOf(h.target)) {
+        const b = state.players[p].board;
+        if (h.stones) for (const pos of pickRandomCells(b, h.stones, (g) => g.kind !== 'stone')) getCell(b, pos.r, pos.c)!.kind = 'stone';
+        if (h.frozen) for (const pos of pickRandomCells(b, h.frozen, (g) => g.kind !== 'stone')) getCell(b, pos.r, pos.c)!.frozenUntil = h.frozenMs ?? 15_000;
+        ensureMoves(ctx, p, []);
+      }
+    }
+  }
+  return state;
 }
+
+/** Which player indexes a rule target means (the player is always index 0). */
+export function sidesOf(t: RuleTarget): PlayerIndex[] {
+  return t === 'player' ? [0] : t === 'opponent' ? [1] : [0, 1];
+}
+
+const sideRules = (state: BattleState, p: PlayerIndex) => state.rules?.sides?.[p];
 
 export function cloneBattle(s: BattleState): BattleState {
   return JSON.parse(JSON.stringify(s)) as BattleState;
@@ -134,6 +166,7 @@ function dealDamage(ctx: Ctx, attacker: PlayerIndex, raw: number, source: string
   target.hp -= hpLoss;
   state.players[attacker].stats.damageDealt += hpLoss + absorbed;
   emit(ctx, { type: 'damage', target: target.index, amount: hpLoss, absorbed, source });
+  if (target.index === 1 && target.hp > 0) checkPhase(ctx);
   if (target.hp <= 0) {
     state.players[attacker].stats.overkill = amount - absorbed - hpLoss;
     state.over = true;
@@ -143,9 +176,43 @@ function dealDamage(ctx: Ctx, attacker: PlayerIndex, raw: number, source: string
   return hpLoss + absorbed;
 }
 
+/** Boss phases: move to the next phase when the opponent's HP drops past its threshold. */
+function checkPhase(ctx: Ctx) {
+  const { state } = ctx;
+  const phases = state.rules?.phases;
+  if (!phases) return;
+  const boss = state.players[1];
+  let phase = state.phase ?? 0;
+  while (phase < phases.length && (boss.hp / boss.maxHp) * 100 <= phases[phase].atHpPct) {
+    const entered = phases[phase];
+    phase++;
+    state.phase = phase;
+    emit(ctx, { type: 'phase', phase });
+    for (const e of entered.onEnter ?? []) applyEffect(ctx, 1, e, 1, 1, 'Phase');
+    // Pulses that start in this phase begin counting now.
+    (state.rules?.pulses ?? []).forEach((p, i) => {
+      if ((p.fromPhase ?? 0) === phase && state.pulseNext) state.pulseNext[i] = state.time + (p.firstAtMs ?? p.everyMs);
+    });
+  }
+}
+
+/** Effects that land on the caster themselves (the rest target the caster's opponent). */
+const SELF_EFFECTS = new Set<Effect['kind']>(['heal', 'shield', 'regen', 'empower', 'convert', 'cleanse']);
+
+/** A pulse "casts" its effects at each target side, as if from the other side (or itself, for self effects). */
+function firePulse(ctx: Ctx, pulse: Pulse) {
+  emit(ctx, { type: 'pulse', target: pulse.target, label: pulse.label });
+  for (const p of sidesOf(pulse.target)) {
+    for (const e of pulse.effects) {
+      if (ctx.state.over) return;
+      applyEffect(ctx, SELF_EFFECTS.has(e.kind) ? p : other(p), e, 1, 1, pulse.label);
+    }
+  }
+}
+
 function heal(ctx: Ctx, p: PlayerIndex, raw: number, source: string): number {
   const pl = ctx.state.players[p];
-  if (ctx.state.over) return 0;
+  if (ctx.state.over || sideRules(ctx.state, p)?.noHealing) return 0;
   const amount = Math.min(pl.maxHp - pl.hp, Math.max(0, Math.round(raw)));
   if (amount <= 0) return 0;
   pl.hp += amount;
@@ -156,6 +223,7 @@ function heal(ctx: Ctx, p: PlayerIndex, raw: number, source: string): number {
 
 function addShield(ctx: Ctx, p: PlayerIndex, raw: number) {
   const pl = ctx.state.players[p];
+  if (sideRules(ctx.state, p)?.noShields) return;
   const amount = Math.min(RULES.maxShield - pl.shield, Math.max(0, Math.round(raw)));
   if (amount <= 0) return;
   pl.shield += amount;
@@ -241,6 +309,10 @@ function castFromGroup(ctx: Ctx, caster: PlayerIndex, g: MatchGroup, depth: numb
   const pl = state.players[caster];
   const size = g.cells.length;
   const cascade = 1 + RULES.cascadeBonus * depth;
+  if (sideRules(state, caster)?.silenced?.includes(g.color)) {
+    emit(ctx, { type: 'silenced', caster, color: g.color });
+    return;
+  }
   if (size < 4) {
     const dmg = Math.round(RULES.basicDamage * cascade);
     emit(ctx, { type: 'basic', caster, color: g.color, damage: dmg, depth });
@@ -468,7 +540,7 @@ export function applyMove(state: BattleState, p: PlayerIndex, a: Pos, b: Pos): B
   // Emit the board event first so the client starts the animation before popups arrive.
   ctx.events.push({ type: 'board', player: p, steps, external: false, delayMs: 0 });
   resolveMatches(ctx, p, true, steps);
-  pl.busyUntil = state.time + steps.reduce((t, s) => t + stepDuration(s), 0);
+  pl.busyUntil = state.time + steps.reduce((t, s) => t + stepDuration(s), 0) * (sideRules(state, p)?.slowMult ?? 1);
   return ctx.events;
 }
 
@@ -477,6 +549,23 @@ export function tick(state: BattleState, dtMs: number): BattleEvent[] {
   const ctx: Ctx = { state, events: [], delay: 0 };
   if (state.over) return ctx.events;
   state.time += dtMs;
+  const rules = state.rules;
+  if (rules) {
+    rules.pulses?.forEach((pulse, i) => {
+      const next = state.pulseNext!;
+      while (!state.over && next[i] <= state.time) {
+        firePulse(ctx, pulse);
+        next[i] += pulse.everyMs;
+      }
+    });
+    if (!state.over && rules.surviveMs !== undefined && state.time >= rules.surviveMs) {
+      state.over = true;
+      state.winner = 0;
+      emit(ctx, { type: 'survived' });
+      emit(ctx, { type: 'gameOver', winner: 0 });
+      return ctx.events;
+    }
+  }
   for (const pl of state.players) {
     for (const s of [...pl.statuses]) {
       while (!state.over && s.nextTickAt <= state.time && s.nextTickAt <= s.expiresAt) {

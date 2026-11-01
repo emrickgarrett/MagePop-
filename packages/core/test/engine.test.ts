@@ -131,8 +131,9 @@ describe('content', () => {
   it('story chapters unlock every character in order', () => {
     expect(STORY.map((c) => c.hero)).toEqual(CHARACTERS.map((c) => c.id));
     expect(STORY.map((c) => c.unlocks)).toEqual(['rime', 'briar', 'nyx', 'volt', null]);
-    for (const ch of STORY) {
-      const taught = ch.fights.flatMap((f) => f.spotlight);
+    // Legacy chapters still teach all five colors through their fights (Ember's new chapter uses lessons too).
+    for (const ch of STORY.slice(1)) {
+      const taught = ch.nodes.flatMap((n) => (n.kind === 'lesson' ? [] : (n.spotlight ?? [])));
       expect(new Set(taught).size).toBe(5);
     }
   });

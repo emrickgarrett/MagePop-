@@ -1,34 +1,13 @@
 import { CHARACTERS, getCharacter } from './characters';
 import { describeSpell } from './describe';
+import { EMBER_CHAPTER } from './story/ember';
+import { G } from './story/goals';
+import { DialogueLine, FightNode, StoryChapter, StoryNode } from './story/types';
 import { GemColor } from './types';
 
-export interface DialogueLine {
-  speaker: string; // character id or 'narrator'
-  text: string;
-  /** Gem to show while the guide explains a spell. */
-  gem?: GemColor;
-}
-
-export interface StoryFight {
-  id: string;
-  title: string;
-  opponent: string;
-  aiLevel: number;
-  /** Colors whose spells this fight teaches (highlighted in the HUD). */
-  spotlight: GemColor[];
-  intro: DialogueLine[];
-  outro: DialogueLine[];
-  boss?: boolean;
-}
-
-export interface StoryChapter {
-  /** The character you play as in this chapter. */
-  hero: string;
-  title: string;
-  fights: StoryFight[];
-  /** Character unlocked by finishing the chapter. */
-  unlocks: string | null;
-}
+export * from './story/types';
+export { G as STAR_GOALS } from './story/goals';
+export { LESSONS } from './story/lessons';
 
 function teach(heroId: string, color: GemColor): DialogueLine[] {
   const ch = getCharacter(heroId);
@@ -107,38 +86,64 @@ function spotlightPlan(heroId: string): GemColor[][] {
   return [colors.slice(0, 2), colors.slice(2, 4), colors.slice(4)];
 }
 
+/**
+ * Chapters 2-5 in their original three-fight form, converted to story nodes. They get the full
+ * "Fracture" rewrite in phase 2 (see the story design doc); their ids are unchanged so progress carries over.
+ */
+function legacyChapter(hero: string, ci: number, order: string[]): StoryChapter {
+  const flavor = FLAVOR[hero];
+  const next = order[ci + 1] ?? null;
+  const plan = spotlightPlan(hero);
+  const regulars = order.filter((id) => id !== hero && id !== next);
+  const bossId = next ?? order[0];
+  const baseLevel = Math.min(ci, 3);
+  const nodes: FightNode[] = [0, 1, 2].map((fi) => {
+    const boss = fi === 2;
+    const opponent = boss ? bossId : regulars[(ci + fi) % regulars.length];
+    const [heroLine, foeLine, winLine] = flavor.lines[fi];
+    return {
+      kind: boss ? 'boss' : 'fight',
+      id: `${hero}-${fi + 1}`,
+      title: boss ? `Boss: ${getCharacter(opponent).name}` : `Trial ${fi + 1}`,
+      opponent,
+      aiLevel: Math.min(5, baseLevel + (boss ? 1 : 0) + (ci === 4 && boss ? 1 : 0)),
+      spotlight: plan[fi],
+      intro: [{ speaker: hero, text: heroLine }, ...plan[fi].flatMap((c) => teach(hero, c)), { speaker: opponent, text: foeLine }],
+      outro: [{ speaker: boss ? opponent : hero, text: winLine }],
+      goals: [G.ultimate(), G.under(120_000)],
+    };
+  });
+  return { hero, title: flavor.title, nodes, unlocks: next };
+}
+
 export function buildStory(): StoryChapter[] {
   const order = chapterOrder();
-  return order.map((hero, ci) => {
-    const flavor = FLAVOR[hero];
-    const next = order[ci + 1] ?? null;
-    const plan = spotlightPlan(hero);
-    const regulars = order.filter((id) => id !== hero && id !== next);
-    const bossId = next ?? order[0];
-    const baseLevel = Math.min(ci, 3);
-    const fights: StoryFight[] = [0, 1, 2].map((fi) => {
-      const boss = fi === 2;
-      const opponent = boss ? bossId : regulars[(ci + fi) % regulars.length];
-      const [heroLine, foeLine, winLine] = flavor.lines[fi];
-      const intro: DialogueLine[] = [
-        ...(ci === 0 && fi === 0 ? BASICS : []),
-        { speaker: hero, text: heroLine },
-        ...plan[fi].flatMap((c) => teach(hero, c)),
-        { speaker: opponent, text: foeLine },
-      ];
-      return {
-        id: `${hero}-${fi + 1}`,
-        title: boss ? `Boss: ${getCharacter(opponent).name}` : `Trial ${fi + 1}`,
-        opponent,
-        aiLevel: Math.min(5, baseLevel + (boss ? 1 : 0) + (ci === 4 && boss ? 1 : 0)),
-        spotlight: plan[fi],
-        intro,
-        outro: [{ speaker: boss ? opponent : hero, text: winLine }],
-        boss,
-      };
-    });
-    return { hero, title: flavor.title, fights, unlocks: next };
-  });
+  return order.map((hero, ci) => (hero === 'ember' ? EMBER_CHAPTER : legacyChapter(hero, ci, order)));
 }
 
 export const STORY: StoryChapter[] = buildStory();
+
+// ---- progress helpers (shared by the game and the tests) ----------------------------------
+
+/** Nodes that must be cleared to finish the chapter (optional challenges don't count). */
+export const requiredNodes = (chap: StoryChapter) => chap.nodes.filter((n) => !n.optional);
+
+export function chapterComplete(chap: StoryChapter, cleared: readonly string[]): boolean {
+  return requiredNodes(chap).every((n) => cleared.includes(n.id));
+}
+
+/**
+ * Can this node be played? The chapter's hero must be unlocked and every earlier required node
+ * cleared (an optional node opens once the node before it is cleared).
+ */
+export function nodeAvailable(chap: StoryChapter, index: number, cleared: readonly string[], unlocked: readonly string[]): boolean {
+  if (!unlocked.includes(chap.hero)) return false;
+  const node = chap.nodes[index];
+  const before = chap.nodes.slice(0, index);
+  if (node.optional) return index === 0 || cleared.includes(chap.nodes[index - 1].id) || before.filter((n) => !n.optional).every((n) => cleared.includes(n.id));
+  return before.filter((n) => !n.optional).every((n) => cleared.includes(n.id));
+}
+
+export const isFightNode = (n: StoryNode): n is FightNode => n.kind !== 'lesson';
+
+export const STORY_NODE_COUNT = STORY.reduce((t, c) => t + requiredNodes(c).length, 0);

@@ -86,7 +86,7 @@ describe('evaluateAchievements', () => {
  * one fails the first test, which keeps every achievement provably earnable.
  */
 type Example = { match?: Partial<Rec>; save?: (s: ReturnType<typeof loadSave>) => ReturnType<typeof loadSave> };
-const allFights = STORY.flatMap((c) => c.fights.map((f) => f.id));
+const allFights = STORY.flatMap((c) => c.nodes.filter((n) => !n.optional).map((n) => n.id));
 const withTotals = (t: Record<string, number>) => (s: ReturnType<typeof loadSave>) => ({ ...s, totals: { ...s.totals, ...t } });
 const winsAs = (id: string, wins: number) => (s: ReturnType<typeof loadSave>) => ({
   ...s,
@@ -96,7 +96,7 @@ const winsAs = (id: string, wins: number) => (s: ReturnType<typeof loadSave>) =>
 const EXAMPLES: Record<string, Example> = {
   'first-win': { match: {} },
   'first-story': { save: (s) => ({ ...s, storyCleared: [allFights[0]] }) },
-  'first-chapter': { save: (s) => ({ ...s, storyCleared: STORY[0].fights.map((f) => f.id) }) },
+  'first-chapter': { save: (s) => ({ ...s, storyCleared: STORY[0].nodes.filter((n) => !n.optional).map((n) => n.id) }) },
   'full-roster': { save: (s) => ({ ...s, unlocked: CHARACTERS.map((c) => c.id) }) },
   valedictorian: { save: (s) => ({ ...s, storyCleared: allFights }) },
   'story-speedrun': { match: { mode: 'story', durationMs: 49_000 } },

@@ -1,4 +1,4 @@
-import { AI_LEVELS, CHARACTERS, STORY } from '@magepop/core';
+import { AI_LEVELS, chapterComplete, CHARACTERS, requiredNodes, STORY } from '@magepop/core';
 import type { MatchRecord, SaveData } from './save';
 
 /**
@@ -59,7 +59,7 @@ const levelIndex = (m: MatchRecord) => AI_LEVELS.findIndex((l) => l.id === m.lev
 const beatLevel = (id: string) => (m: MatchRecord) => won(m) && m.mode !== 'pvp' && levelIndex(m) >= AI_LEVELS.findIndex((l) => l.id === id);
 const total = (s: SaveData, key: string) => s.totals[key] ?? 0;
 const winsAs = (s: SaveData, mage: string) => (s.mageStats[mage]?.bots.wins ?? 0) + (s.mageStats[mage]?.pvp.wins ?? 0);
-const allStoryFights = STORY.flatMap((c) => c.fights.map((f) => f.id));
+const allStoryFights = STORY.flatMap((c) => requiredNodes(c).map((f) => f.id));
 const sec = (n: number) => n * 1000;
 
 /** Per-mage achievements are generated, so new mages get them automatically. */
@@ -98,7 +98,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'first-story',
     name: 'Enrolled',
-    description: 'Clear your first story fight.',
+    description: 'Complete your first step in Story mode.',
     category: 'journey',
     tier: 'bronze',
     icon: '📜',
@@ -111,7 +111,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     category: 'journey',
     tier: 'silver',
     icon: '📖',
-    progress: (s) => [Math.min(1, STORY.filter((c) => c.fights.every((f) => s.storyCleared.includes(f.id))).length), 1],
+    progress: (s) => [Math.min(1, STORY.filter((c) => chapterComplete(c, s.storyCleared)).length), 1],
   },
   {
     id: 'full-roster',
@@ -125,7 +125,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'valedictorian',
     name: 'Valedictorian',
-    description: 'Clear every story fight.',
+    description: 'Clear every required story node.',
     category: 'journey',
     tier: 'gold',
     icon: '🎓',

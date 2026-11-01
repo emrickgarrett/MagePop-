@@ -21,6 +21,7 @@ import {
   COLOR_LABEL,
   Effect,
   MatchEndReason,
+  BattleRules,
   GemColor,
 } from '@magepop/core';
 import { audio, Sfx } from './audio';
@@ -125,6 +126,21 @@ export interface BattleSetup {
   opponent: string;
   aiLevel: AiLevel;
   hp?: [number, number];
+  maxHp?: [number, number];
+  /** Story encounter rules (pulses, phases, survival, mutators). */
+  rules?: BattleRules;
+  /** The opponent is an Echo (gray copy). */
+  echo?: boolean;
+  /** Story lines shown mid-fight. */
+  barks?: { phase?: Record<number, { speaker: string; text: string }>; pulse?: string };
+}
+
+/** A line spoken mid-fight (boss phase taunts, pulses), shown as a speech bubble. */
+export interface Bark {
+  side: PlayerIndex | null;
+  speaker: string;
+  text: string;
+  at: number;
 }
 
 export interface BattleResult {
@@ -226,6 +242,10 @@ export class BattleController {
   readonly display: [DisplayBoard, DisplayBoard];
   fx: FloatFx[] = [];
   vfx: Vfx[] = [];
+  /** Latest mid-fight line (boss taunts, pulse announcements). */
+  bark: Bark | null = null;
+  /** Latest pulse banner ("The Heartstone pulses!"). */
+  banner: { text: string; at: number } | null = null;
   shake: [number, number] = [0, 0]; // real-time ms of last hit per side
   flash: [{ color: string; at: number } | null, { color: string; at: number } | null] = [null, null];
   paused = false;
@@ -254,7 +274,9 @@ export class BattleController {
   constructor(setup: BattleSetup, onEnd: (r: BattleResult) => void, initial?: BattleState) {
     this.setup = setup;
     this.onEnd = onEnd;
-    this.state = initial ?? createBattle({ seed: setup.seed, characters: [setup.player, setup.opponent], hp: setup.hp });
+    this.state =
+      initial ??
+      createBattle({ seed: setup.seed, characters: [setup.player, setup.opponent], hp: setup.hp ?? setup.maxHp, maxHp: setup.maxHp, rules: setup.rules });
     this.aiRng = { rng: (setup.seed * 2654435761) >>> 0 };
     const mk = (p: PlayerIndex): DisplayBoard => ({
       frame: { board: cloneBoard(this.state.players[p].board), marks: new Map(), drops: new Map(), durationMs: 0, moveMs: 0 },
@@ -648,6 +670,26 @@ export class BattleController {
             this.pushVfx({ kind: 'cleanse', side: e.target, color: '#e8fff4', by: e.target });
           });
           break;
+        case 'pulse':
+          this.later(delay, () => {
+            this.banner = { text: e.label, at: this.realNow };
+            audio.play('freeze', { volume: 0.5, pitch: 0.8 });
+          });
+          break;
+        case 'phase': {
+          const line = this.setup.barks?.phase?.[e.phase];
+          this.later(delay, () => {
+            this.shake[1] = this.realNow;
+            this.flash[1] = { color: 'var(--pink)', at: this.realNow };
+            if (line) this.bark = { side: 1, speaker: line.speaker, text: line.text, at: this.realNow };
+            audio.play('ultimate', { pitch: 0.7, volume: 0.8 });
+          });
+          break;
+        }
+        case 'silenced':
+          this.later(delay, () => this.pushFx(e.caster, 'status', 'Silenced!'));
+          break;
+        case 'survived':
         case 'statusRemoved':
         case 'gameOver':
           break;
