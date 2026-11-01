@@ -98,6 +98,10 @@ interface Conn {
   room?: Room;
   /** A pending friend rematch, if any. */
   rematch?: RematchOffer;
+  /** Who you just played, so quick chat ("GG!") still reaches them for a minute after. */
+  lastOpponent?: { conn: Conn; until: number };
+  /** Recent quick-chat send times, for the chat cooldown. */
+  chatTimes: number[];
   alive: boolean;
   tokens: number;
   lastRefill: number;
@@ -199,7 +203,7 @@ export class PvpServer {
       ws.close(1013, 'busy');
       return;
     }
-    const c: Conn = { id: randomUUID(), ws, ip, name: null, alive: true, tokens: this.opts.rate.burst, lastRefill: Date.now() };
+    const c: Conn = { id: randomUUID(), ws, ip, name: null, alive: true, tokens: this.opts.rate.burst, lastRefill: Date.now(), chatTimes: [] };
     this.conns.add(c);
     this.perIp.set(ip, ipCount + 1);
 
@@ -297,6 +301,8 @@ export class PvpServer {
         return this.acceptRematch(c);
       case 'declineRematch':
         return this.cancelRematch(c);
+      case 'chat':
+        return this.chat(c, msg.id);
       case 'resume': {
         const entry = this.resumeTokens.get(msg.token);
         if (!entry || c.match) return fail(c, 'resumeFailed', 'That match is no longer available.');
@@ -432,6 +438,24 @@ export class PvpServer {
     }
   }
 
+  // ---- quick chat -----------------------------------------------------------------------
+
+  /** Chat cooldown: at most one message per 1.5s and 3 per 10s. Extra messages are dropped quietly. */
+  private chatAllowed(c: Conn): boolean {
+    const now = Date.now();
+    c.chatTimes = c.chatTimes.filter((t) => now - t < 10_000);
+    const last = c.chatTimes[c.chatTimes.length - 1];
+    if ((last !== undefined && now - last < 1500) || c.chatTimes.length >= 3) return false;
+    c.chatTimes.push(now);
+    return true;
+  }
+
+  private chat(c: Conn, id: number) {
+    const to = c.match ? c.match.opponentOf(c) : c.lastOpponent && Date.now() < c.lastOpponent.until ? c.lastOpponent.conn : null;
+    if (!to || !this.chatAllowed(c)) return;
+    send(to, { t: 'chat', id });
+  }
+
   private removeFromQueue(c: Conn) {
     const i = this.queue.indexOf(c);
     if (i >= 0) this.queue.splice(i, 1);
@@ -554,6 +578,12 @@ class Match {
     if (this.state.over) this.end(this.state.winner, 'ko');
   }
 
+  /** The other player in this match (null if they're disconnected). */
+  opponentOf(c: Conn): Conn | null {
+    if (c.seat === undefined || this.seats[c.seat] !== c) return null;
+    return this.seats[c.seat === 0 ? 1 : 0];
+  }
+
   forfeit(c: Conn) {
     if (c.seat === undefined || this.seats[c.seat] !== c) return;
     this.end(c.seat === 0 ? 1 : 0, 'forfeit');
@@ -607,6 +637,11 @@ class Match {
     }
     this.server.forget(this);
     const [a, b] = this.seats;
+    if (a && b) {
+      const until = Date.now() + 60_000;
+      a.lastOpponent = { conn: b, until };
+      b.lastOpponent = { conn: a, until };
+    }
     if (this.friendly && reason !== 'server' && a && b && a.ws.readyState === WebSocket.OPEN && b.ws.readyState === WebSocket.OPEN) {
       this.server.offerRematch([a, b]);
     }

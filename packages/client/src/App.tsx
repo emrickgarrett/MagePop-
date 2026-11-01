@@ -18,6 +18,7 @@ import {
 } from './game/save';
 import { BattleScreen } from './screens/BattleScreen';
 import { FriendRematch, MultiplayerLobby } from './screens/Multiplayer';
+import { ResultChat } from './components/QuickChat';
 import { NetBattleController, pvp } from './game/pvp';
 import { AchievementsScreen, AchievementToasts, Toast, toastsFor } from './screens/Achievements';
 import { evaluateAchievements } from './game/achievements';
@@ -315,7 +316,12 @@ export function App() {
                 },
               },
             ],
-            extra: friendly && !cancelled ? <FriendRematch friend={name} onMatch={playOnline} /> : undefined,
+            extra: (
+              <>
+                {!cancelled && saveRef.current.settings.quickChat && <ResultChat opponent={name} />}
+                {friendly && !cancelled && <FriendRematch friend={name} onMatch={playOnline} />}
+              </>
+            ),
           },
         });
       },
@@ -542,6 +548,8 @@ export function App() {
               const s2 = recordMatch(saveRef.current, screen.setup.player, kind, { won: false });
               const rec = historyEntry(screen, r, 'forfeit');
               setSave(unlockAchievements(addHistory(s2, rec), [rec]));
+              // Leaving an online match for the menu: hang up (the forfeit has already been sent).
+              if (screen.mode === 'pvp') pvp.close();
               menu();
             }}
           />

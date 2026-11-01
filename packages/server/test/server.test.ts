@@ -382,3 +382,32 @@ describe('friend rooms', () => {
     expect(q2.got.some((m) => m.t === 'rematch')).toBe(false);
   });
 });
+
+describe('quick chat', () => {
+  it('relays preset ids to the opponent only, with a cooldown, and for a minute after the match', async () => {
+    const url = await start();
+    const a = await ready(url, 'A');
+    const b = await ready(url, 'B');
+    const outsider = await ready(url, 'C');
+    a.send({ t: 'queue', characterId: 'ember' });
+    b.send({ t: 'queue', characterId: 'rime' });
+    await a.waitFor((m) => m.t === 'matchFound');
+    a.send({ t: 'chat', id: 1 });
+    await b.waitFor((m) => m.t === 'chat' && m.id === 1);
+    // Spam is dropped quietly (cooldown), not echoed, and never reaches anyone else.
+    for (let i = 0; i < 5; i++) a.send({ t: 'chat', id: 2 });
+    // Out-of-range ids and free text are rejected outright.
+    a.send({ t: 'chat', id: 99 });
+    a.send({ t: 'chat', text: 'buy gold at ...' });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(b.got.filter((m) => m.t === 'chat')).toHaveLength(1);
+    expect(a.got.filter((m) => m.t === 'chat')).toHaveLength(0);
+    expect(outsider.got.some((m) => m.t === 'chat')).toBe(false);
+    expect(a.got.filter((m) => m.t === 'error' && m.code === 'badMessage')).toHaveLength(2);
+    // After the match: "GG" still reaches them.
+    b.send({ t: 'forfeit' });
+    await a.waitFor((m) => m.t === 'matchOver');
+    b.send({ t: 'chat', id: 6 });
+    await a.waitFor((m) => m.t === 'chat' && m.id === 6);
+  });
+});

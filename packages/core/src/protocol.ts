@@ -37,7 +37,9 @@ export type ClientMessage =
   | { t: 'closeRoom' }
   /** After a friend battle: ask for (or turn down) another round with the same friend. */
   | { t: 'rematch' }
-  | { t: 'declineRematch' };
+  | { t: 'declineRematch' }
+  /** Quick chat: the index of a preset message (never free text). */
+  | { t: 'chat'; id: number };
 
 export interface OpponentInfo {
   name: string;
@@ -45,6 +47,12 @@ export interface OpponentInfo {
 }
 
 export type MatchEndReason = 'ko' | 'forfeit' | 'disconnect' | 'timeout' | 'server';
+
+/**
+ * Quick chat presets. Only the index travels over the network, so nobody can send anything else.
+ * Append new ones at the end (indexes are what old clients understand).
+ */
+export const QUICK_CHAT = ['Hi!', 'Good luck!', 'Nice combo!', 'Ouch!', 'So close!', 'Well played', 'GG', 'Rematch?'] as const;
 
 export type ErrorCode =
   | 'version'
@@ -96,6 +104,8 @@ export type ServerMessage =
    * when they've asked, 'cancelled' when they left or said no.
    */
   | { t: 'rematch'; status: 'available' | 'opponentWants' | 'waiting' | 'cancelled' }
+  /** Your opponent sent a quick chat message. */
+  | { t: 'chat'; id: number }
   | { t: 'resumed'; you: PlayerIndex; opponent: OpponentInfo; state: BattleState; startsInMs: number }
   /**
    * Engine events, already applied on the server. `time` is server battle time (for clock sync).
@@ -173,6 +183,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       const code = normalizeRoomCode(m.code);
       return code && isCharacterId(m.characterId) ? { t: 'joinRoom', code, characterId: m.characterId } : null;
     }
+    case 'chat':
+      return isInt(m.id, 0, QUICK_CHAT.length - 1) ? { t: 'chat', id: m.id } : null;
     case 'closeRoom':
     case 'rematch':
     case 'declineRematch':

@@ -11,6 +11,8 @@ export interface Settings {
   skipReplayDialogue: boolean;
   /** Show the controls hint line during battles. */
   battleHints: boolean;
+  /** Show and use quick chat in online matches. */
+  quickChat: boolean;
   /** Display name for online matches ('' = not chosen yet). */
   playerName: string;
   /** Last mage picked for online matches. */
@@ -107,6 +109,7 @@ export const DEFAULT_SETTINGS: Settings = {
   combatText: true,
   skipReplayDialogue: false,
   battleHints: true,
+  quickChat: true,
   playerName: '',
   pvpMage: null,
   musicVolume: 0.6,

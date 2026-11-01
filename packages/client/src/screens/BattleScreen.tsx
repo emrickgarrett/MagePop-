@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BoardView } from '../components/BoardView';
 import { CalloutStage, PlayerPanel, SpellLegend } from '../components/Hud';
 import { SpellFxLayer } from '../components/SpellFx';
+import { ChatBubble, ChatMenu, useQuickChat } from '../components/QuickChat';
 import { HowToPlay } from '../components/HowToPlay';
 import { BattleController, BattleResult, BattleSetup } from '../game/BattleController';
 import { NetBattleController, pvp } from '../game/pvp';
@@ -87,6 +88,8 @@ export function BattleScreen({
     [setup],
   );
   const online = ctrl instanceof NetBattleController;
+  const chatOn = online && settings.quickChat;
+  const chat = useQuickChat(chatOn);
   useEffect(() => () => (ctrl instanceof NetBattleController ? ctrl.dispose() : undefined), [ctrl]);
   const [, setFrame] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -172,7 +175,7 @@ export function BattleScreen({
           {header}
           {online && <PingBadge />}
         </div>
-        <div className="battle-hint">{settings.battleHints ? `Drag or click gems to swap · Esc for ${online ? 'menu' : 'pause'}` : ''}</div>
+        <div className="battle-hint">{settings.battleHints ? `Drag or click gems to swap · Esc for ${online ? 'menu' : 'pause'}${chatOn ? ' · 1-8 chat' : ''}` : ''}</div>
         <button
           className="btn small ghost"
           onClick={() => {
@@ -192,6 +195,12 @@ export function BattleScreen({
       <div className="arena">
         <div className="arena-side me">
           <PlayerPanel {...me} fx={[]} time={s.time} side={0} tag="YOU" />
+          {chatOn && (
+            <>
+              <ChatBubble line={chat.mine} side="me" now={performance.now()} />
+              <ChatMenu onPick={chat.send} />
+            </>
+          )}
           <div ref={myBoard} className={`board-wrap themed ${canAct ? 'ready' : ''}`} style={boardStyle(me.ch.id, me.ch.palette.primary)}>
             <BoardView
               theme={me.ch.id}
@@ -214,6 +223,7 @@ export function BattleScreen({
         <div className="vs">VS</div>
         <div className="arena-side foe">
           <PlayerPanel {...foe} time={s.time} side={1} tag={(opponentTag ?? setup.aiLevel.name).toUpperCase()} />
+          {chatOn && <ChatBubble line={chat.theirs} side="them" now={performance.now()} />}
           <div ref={foeBoard} className="board-wrap themed" style={boardStyle(foe.ch.id, foe.ch.palette.primary)}>
             <BoardView theme={foe.ch.id} frame={ctrl.display[1].frame} engineTime={s.time} cell={cells.small} interactive={false} stunned={foe.stunned} label="Opponent board" />
           </div>
@@ -253,6 +263,11 @@ export function BattleScreen({
             >
               {online ? 'Back to the fight' : 'Resume'}
             </button>
+            {chatOn && (
+              <button className="btn ghost" onClick={chat.toggleMute}>
+                {chat.muted ? 'Unmute opponent chat' : 'Mute opponent chat'}
+              </button>
+            )}
             <button className="btn ghost" onClick={() => setGuide('pause')}>
               How to play
             </button>

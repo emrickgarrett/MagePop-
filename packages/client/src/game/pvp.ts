@@ -28,6 +28,7 @@ import {
   playersForSeat,
   Pos,
   PROTOCOL_VERSION,
+  QUICK_CHAT,
   sanitizeName,
   ServerMessage,
   stateForSeat,
@@ -104,6 +105,8 @@ export function parseServerMessage(text: string): ServerMessage | null {
       return ['available', 'opponentWants', 'waiting', 'cancelled'].includes(m.status as string)
         ? { t: 'rematch', status: m.status as 'available' | 'opponentWants' | 'waiting' | 'cancelled' }
         : null;
+    case 'chat':
+      return Number.isInteger(m.id) && (m.id as number) >= 0 && (m.id as number) < QUICK_CHAT.length ? { t: 'chat', id: m.id as number } : null;
     case 'notice':
       return { t: 'notice', message: String(m.message).slice(0, 200) };
     case 'pong':
@@ -135,6 +138,9 @@ export class PvpLink {
   private name = 'Mage';
   private resumeToken: string | null = null;
   private reconnectUntil = 0;
+  /** Mute the current opponent's quick chat (cleared when a new match starts). */
+  chatMuted = false;
+  private chatTimes: number[] = [];
   /** Smoothed round-trip time to the server in ms (null until measured). */
   rtt: number | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -243,6 +249,7 @@ export class PvpLink {
         break;
       }
       case 'matchFound':
+        this.chatMuted = false;
         this.resumeToken = msg.resumeToken;
         this.roomCode = null;
         this.rematchStatus = null;
@@ -319,6 +326,21 @@ export class PvpLink {
     this.send({ t: 'closeRoom' });
     this.roomCode = null;
     if (this.status === 'hosting') this.setStatus('ready', null);
+  }
+
+  /**
+   * Send a quick chat preset. Same cooldown as the server (1 per 1.5s, 3 per 10s), so the
+   * bubble only shows if the message will actually be delivered. Returns whether it was sent.
+   */
+  sendChat(id: number): boolean {
+    if (!Number.isInteger(id) || id < 0 || id >= QUICK_CHAT.length || this.ws?.readyState !== WebSocket.OPEN) return false;
+    const now = Date.now();
+    this.chatTimes = this.chatTimes.filter((t) => now - t < 10_000);
+    const last = this.chatTimes[this.chatTimes.length - 1];
+    if ((last !== undefined && now - last < 1600) || this.chatTimes.length >= 3) return false;
+    this.chatTimes.push(now);
+    this.send({ t: 'chat', id });
+    return true;
   }
 
   requestRematch() {

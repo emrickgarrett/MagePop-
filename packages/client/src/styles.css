@@ -2847,3 +2847,149 @@ small {
 .ping.bad {
   color: #ff8a9b;
 }
+
+/* ---- Quick chat ---- */
+.arena-side {
+  position: relative;
+}
+.chat-bubble {
+  position: absolute;
+  z-index: 25;
+  top: -6px;
+  max-width: 260px;
+  padding: 8px 16px;
+  border-radius: 18px;
+  background: #fff;
+  color: #1d0d38;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 19px;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: bubble-pop 0.28s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+/* Speech-bubble tail pointing down at the portrait. */
+.chat-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 30px;
+  border: 10px solid transparent;
+  border-top-color: #fff;
+  border-bottom: 0;
+}
+.chat-bubble.me {
+  left: 96px;
+  top: -24px;
+}
+.chat-bubble.them {
+  left: 88px;
+  top: -22px;
+}
+.chat-bubble small {
+  display: block;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7a5aa8;
+}
+@keyframes bubble-pop {
+  from {
+    transform: translateY(8px) scale(0.6);
+    opacity: 0;
+  }
+}
+.chat-menu {
+  position: absolute;
+  z-index: 26;
+  top: 8px;
+  right: 8px;
+}
+.chat-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-line);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 17px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.chat-toggle:hover,
+.chat-toggle.open {
+  background: rgba(255, 255, 255, 0.2);
+}
+.chat-pop {
+  position: absolute;
+  right: 0;
+  top: 42px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 300px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(20, 8, 45, 0.97);
+  border: 1px solid var(--panel-line);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  animation: bubble-pop 0.18s ease-out;
+}
+.chat-pop button,
+.chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.chat-pop button:hover,
+.chip-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.chat-pop kbd,
+.chip-btn kbd {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-family: inherit;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--ink-dim);
+}
+.result-chat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.result-chat-lines {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  min-height: 52px;
+  align-items: flex-end;
+}
+.result-chat-lines .chat-bubble {
+  position: relative;
+  top: 0;
+  left: 0;
+}
+.result-chat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 760px;
+}

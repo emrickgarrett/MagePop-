@@ -303,6 +303,7 @@ export function SettingsScreen({
               setTimeout(() => isFullscreen().then(setFull), 250);
             }}
           />
+          <Toggle label="Quick chat" desc="Preset messages in online matches (keys 1-8)." on={st.quickChat} onChange={(v) => set({ quickChat: v })} />
           <Toggle label="Spell effects" desc="Projectiles, board auras and ultimate banners." on={st.spellEffects} onChange={(v) => set({ spellEffects: v })} />
           <Toggle label="Screen shake" desc="Health panels shake when a hit lands." on={st.screenShake} onChange={(v) => set({ screenShake: v })} />
           <Toggle label="Combat text" desc="Floating damage, healing and spell names." on={st.combatText} onChange={(v) => set({ combatText: v })} />
