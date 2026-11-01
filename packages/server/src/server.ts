@@ -15,6 +15,7 @@
  */
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { createServer, IncomingMessage, Server } from 'node:http';
+import { MetaStats } from './stats';
 import { WebSocket, WebSocketServer } from 'ws';
 import {
   applyMove,
@@ -63,6 +64,8 @@ export interface ServerOptions {
   joinAttemptsPerMinute: number;
   /** How long both players have to agree to a friend rematch. */
   rematchWindowMs: number;
+  /** Where anonymous meta stats are saved (null = memory only). */
+  statsDir: string | null;
   log: (msg: string) => void;
 }
 
@@ -81,6 +84,7 @@ export const DEFAULT_OPTIONS: ServerOptions = {
   maxRooms: 5000,
   joinAttemptsPerMinute: 10,
   rematchWindowMs: 60_000,
+  statsDir: null,
   log: (m) => console.log(`${new Date().toISOString()} ${m}`),
 };
 
@@ -142,13 +146,26 @@ export class PvpServer {
   private rooms = new Map<string, Room>();
   private joinAttempts = new Map<string, { count: number; resetAt: number }>();
   private heartbeat: NodeJS.Timeout;
+  /** Anonymous pick and win counts per mage, for watching the meta. */
+  readonly meta: MetaStats;
 
   constructor(opts: Partial<ServerOptions> = {}) {
     this.opts = { ...DEFAULT_OPTIONS, ...opts };
+    this.meta = new MetaStats(this.opts.statsDir, this.opts.log);
     this.http = createServer((req, res) => {
-      // Only a health check over plain HTTP; everything else is the WebSocket upgrade.
-      if (req.url === '/health') {
+      // Plain HTTP: a health check and the public meta stats; everything else is the WebSocket upgrade.
+      const url = new URL(req.url ?? '/', 'http://local');
+      if (req.method === 'GET' && url.pathname === '/health') {
         res.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
+      } else if (req.method === 'GET' && url.pathname === '/stats') {
+        // ?days=1..365 (default 30), ?mode=quick|friend|all (default all). Anything else falls back to defaults.
+        const d = url.searchParams.get('days');
+        const days = d && /^\d{1,3}$/.test(d) ? Math.min(365, Math.max(1, Number(d))) : 30;
+        const m = url.searchParams.get('mode');
+        const mode = m === 'quick' || m === 'friend' ? m : 'all';
+        res
+          .writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=30' })
+          .end(this.meta.json(days, mode));
       } else {
         res.writeHead(426, { 'content-type': 'text/plain' }).end('MagePop PVP server: connect with a WebSocket');
       }
@@ -158,7 +175,8 @@ export class PvpServer {
     this.heartbeat = setInterval(() => this.reap(), this.opts.heartbeatMs);
   }
 
-  listen(): Promise<number> {
+  async listen(): Promise<number> {
+    await this.meta.start();
     return new Promise((resolve) =>
       this.http.listen(this.opts.port, () => {
         const addr = this.http.address();
@@ -180,6 +198,7 @@ export class PvpServer {
     }
     await new Promise<void>((r) => this.wss.close(() => r()));
     await new Promise<void>((r) => this.http.close(() => r()));
+    await this.meta.stop();
   }
 
   get stats() {
@@ -636,6 +655,14 @@ class Match {
       }
     }
     this.server.forget(this);
+    // Anonymous meta stats (the stats module skips server shutdowns and very short matches).
+    this.server.meta.record({
+      mages: [this.info[0].characterId, this.info[1].characterId],
+      winner,
+      reason,
+      durationMs: this.state.time,
+      mode: this.friendly ? 'friend' : 'quick',
+    });
     const [a, b] = this.seats;
     if (a && b) {
       const until = Date.now() + 60_000;

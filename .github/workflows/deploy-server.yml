@@ -42,6 +42,16 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
         if: env.FLY_API_TOKEN != ''
 
+      # The meta stats volume (1 GB, a few cents a month). Created once; later runs see it and skip.
+      - name: Ensure stats volume
+        if: env.FLY_API_TOKEN != ''
+        run: |
+          if flyctl volumes list -a magepop-server --json | grep -q '"magepop_stats"'; then
+            echo "magepop_stats volume exists"
+          else
+            flyctl volumes create magepop_stats --app magepop-server --region iad --size 1 --yes
+          fi
+
       - name: Deploy to Fly.io
         if: env.FLY_API_TOKEN != ''
         run: flyctl deploy --remote-only --ha=false

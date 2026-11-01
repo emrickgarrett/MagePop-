@@ -10,6 +10,13 @@ primary_region = "iad"
   PORT = "8787"
   # Fly's proxy sets this to the real client IP (used for per-IP connection limits).
   TRUSTED_IP_HEADER = "fly-client-ip"
+  # Anonymous meta stats (pick and win counts per mage) are saved here; see packages/server/src/stats.ts.
+  STATS_DIR = "/data"
+
+# A small persistent disk for the meta stats file (created by the deploy workflow if missing).
+[mounts]
+  source = "magepop_stats"
+  destination = "/data"
 
 [http_service]
   internal_port = 8787

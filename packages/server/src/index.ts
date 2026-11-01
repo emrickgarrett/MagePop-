@@ -5,6 +5,7 @@
  *   TRUSTED_IP_HEADER     header with the real client IP when behind a trusted proxy
  *                         (set to "fly-client-ip" on Fly.io; leave unset anywhere else)
  *   MAX_CONNECTIONS, MAX_CONNECTIONS_PER_IP   optional overrides
+ *   STATS_DIR             folder for anonymous meta stats (a Fly volume); unset = memory only
  */
 import { PvpServer } from './server';
 
@@ -13,6 +14,7 @@ const num = (v: string | undefined) => (v && /^\d+$/.test(v) ? Number(v) : undef
 const server = new PvpServer({
   port: num(process.env.PORT) ?? 8787,
   trustedIpHeader: process.env.TRUSTED_IP_HEADER || undefined,
+  statsDir: process.env.STATS_DIR || null,
   ...(num(process.env.MAX_CONNECTIONS) ? { maxConnections: num(process.env.MAX_CONNECTIONS)! } : {}),
   ...(num(process.env.MAX_CONNECTIONS_PER_IP) ? { maxConnectionsPerIp: num(process.env.MAX_CONNECTIONS_PER_IP)! } : {}),
 });

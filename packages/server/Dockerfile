@@ -16,10 +16,12 @@ COPY packages/server packages/server
 RUN npm run build -w @magepop/server
 
 FROM node:26-alpine
+# su-exec: drop from root to the "node" user after fixing the stats volume's ownership.
+RUN apk add --no-cache su-exec
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/packages/server/dist/server.cjs ./server.cjs
-# Run as the unprivileged "node" user, never root.
-USER node
 EXPOSE 8787
-CMD ["node", "server.cjs"]
+# A freshly mounted volume is owned by root. Hand it to "node", then run the server as "node"
+# (never root): the only thing that runs as root is this chown.
+CMD ["sh", "-c", "if [ -n \"$STATS_DIR\" ] && [ -d \"$STATS_DIR\" ]; then chown node:node \"$STATS_DIR\"; fi; exec su-exec node node server.cjs"]
