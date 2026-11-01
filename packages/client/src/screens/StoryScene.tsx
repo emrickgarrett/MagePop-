@@ -24,7 +24,7 @@ function portraitSrc(id: string, expr: Expression | undefined, revealed?: boolea
 const FACING: Record<string, 'left' | 'right' | 'front'> = {
   ember: 'right',
   rime: 'left',
-  briar: 'front',
+  briar: 'right',
   nyx: 'left',
   volt: 'front',
   'volt-sad': 'right',
