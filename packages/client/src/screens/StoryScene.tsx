@@ -10,7 +10,11 @@ import { Gem } from '../components/Gem';
 const SCENE_SRC = (id: string) => `assets/scenes/${id}.jpg`;
 const MAIN_PORTRAIT = (id: string) => `assets/portraits/${id}.png`;
 
-function portraitSrc(id: string, expr: Expression | undefined, revealed?: boolean) {
+/** Mages with a face-hidden portrait, shown while the story still calls them "???". */
+const SHROUDED = new Set(['hollow']);
+
+function portraitSrc(id: string, expr: Expression | undefined, revealed?: boolean, name?: string) {
+  if (name === '???' && SHROUDED.has(id)) return `assets/portraits/expr/${id}-shrouded.webp`;
   if (expr && expr !== 'neutral') return `assets/portraits/expr/${id}-${expr}.webp`;
   if (revealed) return `assets/portraits/expr/${id}-revealed.webp`;
   return MAIN_PORTRAIT(id);
@@ -69,7 +73,7 @@ function stageAt(lines: DialogueLine[], upTo: number, hero: string): Stage {
     const facing = facingOf(id, l.expr);
     st[side] = {
       id,
-      src: portraitSrc(id, l.expr, l.revealed),
+      src: portraitSrc(id, l.expr, l.revealed, l.name),
       flip: facing === side,
       echo: !!l.echo,
       enteredAt: prev?.id === id ? prev.enteredAt : i,
@@ -126,7 +130,7 @@ export function StoryScene({ lines, hero, title, onDone }: { lines: DialogueLine
       const l = lines[k];
       if (l.bg) urls.add(SCENE_SRC(l.bg));
       const id = l.speaker === 'hero' ? hero : l.speaker;
-      if (isMage(id)) urls.add(portraitSrc(id, l.expr, l.revealed));
+      if (isMage(id)) urls.add(portraitSrc(id, l.expr, l.revealed, l.name));
     }
     urls.forEach((u) => {
       const img = new Image();

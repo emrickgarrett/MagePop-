@@ -46,23 +46,6 @@ export const FINALE_CHAPTER: StoryChapter = {
       goals: [G.spells(6), G.under(150_000)],
     },
     {
-      kind: 'fight',
-      id: 'finale-colorless',
-      ...scene('finale-colorless'),
-      title: 'Challenge: Colorless',
-      optional: true,
-      opponent: 'hollow',
-      aiLevel: 4,
-      twist: 'The Hollow at Master difficulty. Nobody can heal or shield.',
-      rules: {
-        sides: [
-          { noHealing: true, noShields: true },
-          { noHealing: true, noShields: true },
-        ],
-      },
-      goals: [G.under(150_000), G.hpAbove(30)],
-    },
-    {
       kind: 'boss',
       id: 'finale-boss',
       ...scene('finale-boss'),
@@ -103,6 +86,23 @@ export const FINALE_CHAPTER: StoryChapter = {
         },
       },
       goals: [G.ultimate(2), G.hpAbove(30)],
+    },
+    {
+      kind: 'fight',
+      id: 'finale-colorless',
+      ...scene('finale-colorless'),
+      title: 'Challenge: Colorless',
+      optional: true,
+      opponent: 'hollow',
+      aiLevel: 4,
+      twist: 'A rematch after the finale: the Hollow at Master difficulty. Nobody can heal or shield.',
+      rules: {
+        sides: [
+          { noHealing: true, noShields: true },
+          { noHealing: true, noShields: true },
+        ],
+      },
+      goals: [G.under(150_000), G.hpAbove(30)],
     },
   ],
 };

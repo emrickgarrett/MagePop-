@@ -57,6 +57,8 @@ EXPRESSIONS = {
     "volt-surprised": "Volt_expression_SURPRISED._Adult_female_Stormcalle_ca91b222-f33f-4f31-b408-e0baffd4d1fd.png",
     "volt-sad": "Volt_expression_SAD_a_young_adult_female_Stormcal_a5ebb828-3c74-4b37-b72d-ea734feeaa64.png",
     # The Hollow: hooded is her normal portrait; "revealed" is the hood-down face for the finale.
+    # "shrouded" is her face hidden in the hood's shadow, used while she's still "???".
+    "hollow-shrouded": "Hollow_SHROUDED_hooded_mystery_portrait._Head-and-_9a8d2dc8-8f4c-4d7c-bca1-81952f6c1568.png",
     "hollow-revealed": "Hollow_REVEALED_neutral_expression._Head-and-shoul_150a9d6a-908a-4ad0-9d83-b52de0964429.png",
     "hollow-happy": "Hollow_expression_HAPPY._Head-and-shoulders_portra_7d157d9e-69a0-4f51-a050-12cd628318a4.png",
     "hollow-angry": "Hollow_expression_ANGRY._Head-and-shoulders_portra_f7a3e057-9b4c-47b9-a9ed-d0a44659a290.png",
