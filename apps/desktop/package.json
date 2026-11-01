@@ -1,6 +1,6 @@
 {
   "name": "@magepop/desktop",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "MagePop!: a match-3 spell-duel game",
   "main": "main.cjs",

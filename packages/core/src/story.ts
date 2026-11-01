@@ -1,6 +1,6 @@
 import { CHARACTERS, getCharacter } from './characters';
 import { describeSpell } from './describe';
-import { COLOR_LABEL, GemColor } from './types';
+import { GemColor } from './types';
 
 export interface DialogueLine {
   speaker: string; // character id or 'narrator'
@@ -31,17 +31,18 @@ export interface StoryChapter {
 }
 
 function teach(heroId: string, color: GemColor): DialogueLine[] {
-  const s = getCharacter(heroId).spells[color];
+  const ch = getCharacter(heroId);
+  const s = ch.spells[color];
   return [
     {
       speaker: 'narrator',
       gem: color,
-      text: `${COLOR_LABEL[color]} — match 4 to cast ${s.active.name}: ${describeSpell(s.active)}`,
+      text: `Match 4 of these to cast ${s.active.name}: ${describeSpell(s.active, ch)}`,
     },
     {
       speaker: 'narrator',
       gem: color,
-      text: `Match 5 or more (lines, L or T shapes) for the ultimate, ${s.ultimate.name}: ${describeSpell(s.ultimate)}`,
+      text: `Match 5 or more (lines, L or T shapes) for the ultimate, ${s.ultimate.name}: ${describeSpell(s.ultimate, ch)}`,
     },
   ];
 }

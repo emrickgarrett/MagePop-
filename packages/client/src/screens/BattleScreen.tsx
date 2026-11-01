@@ -1,7 +1,9 @@
-import { getCharacter, GemColor, PlayerIndex, validMoves } from '@magepop/core';
+import { BattleState, getCharacter, GemColor, PlayerIndex, Pos, validMoves } from '@magepop/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BoardView } from '../components/BoardView';
 import { PlayerPanel, SpellLegend } from '../components/Hud';
+import { SpellFxLayer } from '../components/SpellFx';
+import { HowToPlay } from '../components/HowToPlay';
 import { BattleController, BattleResult, BattleSetup } from '../game/BattleController';
 import type { Settings } from '../game/save';
 import { themedBoardSrc } from '../game/themes';
@@ -24,6 +26,8 @@ function useCellSize() {
 }
 
 const COUNTDOWN_MS = 1600;
+/** Show a suggested swap after this long without moving. */
+const HINT_AFTER_MS = 8000;
 
 /** Board frame tinted with the champion's color, over their themed background when it exists. */
 function boardStyle(theme: string, accent: string): React.CSSProperties {
@@ -39,6 +43,8 @@ export function BattleScreen({
   header,
   spotlight,
   settings,
+  firstBattle,
+  onGuideSeen,
   onEnd,
   onQuit,
 }: {
@@ -46,8 +52,12 @@ export function BattleScreen({
   header: string;
   spotlight?: GemColor[];
   settings: Settings;
+  /** Show the How to Play guide before the countdown. */
+  firstBattle?: boolean;
+  onGuideSeen?: () => void;
   onEnd: (r: BattleResult) => void;
-  onQuit: () => void;
+  /** Forfeit from the pause menu (counts as a loss). */
+  onQuit: (state: BattleState) => void;
 }) {
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
@@ -55,17 +65,19 @@ export function BattleScreen({
   const [, setFrame] = useState(0);
   const [paused, setPaused] = useState(false);
   const [countdown, setCountdown] = useState(true);
+  const [guide, setGuide] = useState<'first' | 'pause' | null>(firstBattle ? 'first' : null);
+  // Idle hint: if you can move but haven't for a while, a valid swap starts to glow.
+  const idleSince = useRef(0);
+  const hint = useRef<{ a: Pos; b: Pos } | null>(null);
   const cells = useCellSize();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const myBoard = useRef<HTMLDivElement>(null);
+  const foeBoard = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Dev-only hook for automated play-testing.
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__tp = { ctrl, validMoves };
     ctrl.paused = true;
-    audio.play('ready');
-    const t = setTimeout(() => {
-      setCountdown(false);
-      ctrl.paused = false;
-    }, COUNTDOWN_MS);
     let raf = 0;
     const loop = (t: number) => {
       ctrl.update(t);
@@ -73,15 +85,24 @@ export function BattleScreen({
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(t);
-    };
+    return () => cancelAnimationFrame(raf);
   }, [ctrl]);
+
+  // "Ready… Pop!" countdown, held back until the first-time guide is closed.
+  const guideOpenAtStart = guide === 'first';
+  useEffect(() => {
+    if (guideOpenAtStart) return;
+    audio.play('ready');
+    const t = setTimeout(() => {
+      setCountdown(false);
+      ctrl.paused = false;
+    }, COUNTDOWN_MS);
+    return () => clearTimeout(t);
+  }, [ctrl, guideOpenAtStart]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !countdown) {
+      if (e.key === 'Escape' && !countdown && !guide) {
         setPaused((p) => {
           ctrl.paused = !p;
           return !p;
@@ -90,7 +111,7 @@ export function BattleScreen({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ctrl, countdown]);
+  }, [ctrl, countdown, guide]);
 
   const s = ctrl.state;
   const side = (p: PlayerIndex) => {
@@ -110,9 +131,15 @@ export function BattleScreen({
   const me = side(0);
   const foe = side(1);
   const canAct = ctrl.canAct(0);
+  if (!canAct) {
+    idleSince.current = ctrl.now;
+    hint.current = null;
+  } else if (settings.battleHints && !hint.current && ctrl.now - idleSince.current > HINT_AFTER_MS) {
+    hint.current = validMoves(s, 0)[0] ?? null;
+  }
 
   return (
-    <div className="battle-screen">
+    <div className="battle-screen" ref={rootRef}>
       <div className="battle-top">
         <div className="battle-header">{header}</div>
         <div className="battle-hint">{settings.battleHints ? 'Drag or click gems to swap · Esc to pause' : ''}</div>
@@ -129,14 +156,19 @@ export function BattleScreen({
       <div className="arena">
         <div className="arena-side me">
           <PlayerPanel {...me} time={s.time} side={0} tag="YOU" />
-          <div className={`board-wrap themed ${canAct ? 'ready' : ''}`} style={boardStyle(me.ch.id, me.ch.palette.primary)}>
+          <div ref={myBoard} className={`board-wrap themed ${canAct ? 'ready' : ''}`} style={boardStyle(me.ch.id, me.ch.palette.primary)}>
             <BoardView
               theme={me.ch.id}
               frame={ctrl.display[0].frame}
               engineTime={s.time}
               cell={cells.big}
               interactive={canAct}
-              onMove={(a, b) => ctrl.humanMove(a, b)}
+              onMove={(a, b) => {
+                idleSince.current = ctrl.now;
+                hint.current = null;
+                ctrl.humanMove(a, b);
+              }}
+              hint={hint.current}
               stunned={me.stunned}
               label="Your board"
             />
@@ -146,14 +178,25 @@ export function BattleScreen({
         <div className="vs">VS</div>
         <div className="arena-side foe">
           <PlayerPanel {...foe} time={s.time} side={1} tag={setup.aiLevel.name.toUpperCase()} />
-          <div className="board-wrap themed" style={boardStyle(foe.ch.id, foe.ch.palette.primary)}>
+          <div ref={foeBoard} className="board-wrap themed" style={boardStyle(foe.ch.id, foe.ch.palette.primary)}>
             <BoardView theme={foe.ch.id} frame={ctrl.display[1].frame} engineTime={s.time} cell={cells.small} interactive={false} stunned={foe.stunned} label="Opponent board" />
           </div>
           <SpellLegend ch={foe.ch} compact />
         </div>
       </div>
 
-      {countdown && (
+      <SpellFxLayer vfx={settings.spellEffects ? ctrl.vfx : []} now={ctrl.now} boards={[myBoard, foeBoard]} root={rootRef} />
+
+      {guide && (
+        <HowToPlay
+          theme={me.ch.id}
+          onClose={() => {
+            if (guide === 'first') onGuideSeen?.();
+            setGuide(null);
+          }}
+        />
+      )}
+      {countdown && !guide && (
         <div className="overlay countdown">
           <div className="count-text">Ready… Pop!</div>
         </div>
@@ -171,7 +214,10 @@ export function BattleScreen({
             >
               Resume
             </button>
-            <button className="btn ghost" onClick={onQuit}>
+            <button className="btn ghost" onClick={() => setGuide('pause')}>
+              How to play
+            </button>
+            <button className="btn ghost" onClick={() => onQuit(ctrl.state)}>
               Forfeit &amp; quit
             </button>
           </div>

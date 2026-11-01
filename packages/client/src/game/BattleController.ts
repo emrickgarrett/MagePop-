@@ -19,6 +19,8 @@ import {
   tick,
   TIMING,
   COLOR_LABEL,
+  Effect,
+  GemColor,
 } from '@magepop/core';
 import { audio, Sfx } from './audio';
 
@@ -132,11 +134,86 @@ export interface BattleResult {
 
 const FX_LIFETIME = 1500;
 
+// ---------------------------------------------------------------------------
+// Spell visuals (projectiles, board auras, ultimate banners). Driven by the controller clock so
+// they freeze with the pause menu.
+// ---------------------------------------------------------------------------
+
+export type VfxKind =
+  | 'projectile'
+  | 'impact'
+  | 'heal'
+  | 'shield'
+  | 'poison'
+  | 'burn'
+  | 'freeze'
+  | 'shatter'
+  | 'petrify'
+  | 'stun'
+  | 'empower'
+  | 'cleanse'
+  | 'ultimate';
+
+export interface Vfx {
+  id: number;
+  kind: VfxKind;
+  /** The board it plays on (projectiles: the target). */
+  side: PlayerIndex;
+  /** Projectiles: the caster's side. */
+  from?: PlayerIndex;
+  /** CSS color. */
+  color: string;
+  born: number;
+  duration: number;
+  /** 0..1 strength (bigger hits, ultimates). */
+  power: number;
+  gem?: GemColor;
+  theme?: string;
+  /** Ultimate banner text. */
+  label?: string;
+}
+
+/** How long a spell takes to fly from one board to the other. Its effects land on arrival. */
+export const PROJECTILE_MS = 420;
+
+const VFX_MS: Record<VfxKind, number> = {
+  projectile: PROJECTILE_MS,
+  impact: 650,
+  heal: 1100,
+  shield: 900,
+  poison: 1300,
+  burn: 1300,
+  freeze: 1100,
+  shatter: 800,
+  petrify: 900,
+  stun: 900,
+  empower: 1000,
+  cleanse: 900,
+  ultimate: 1250,
+};
+
+/** Effects that land on the opponent (so the spell flies across). */
+const OFFENSIVE = new Set<Effect['kind']>([
+  'damage',
+  'multiHit',
+  'drain',
+  'poison',
+  'freeze',
+  'petrify',
+  'destroy',
+  'shatter',
+  'stun',
+  'damageIfPoisoned',
+]);
+
+const gemColor = (c: GemColor) => `var(--gem-${c})`;
+
 export class BattleController {
   readonly state: BattleState;
   readonly setup: BattleSetup;
   readonly display: [DisplayBoard, DisplayBoard];
   fx: FloatFx[] = [];
+  vfx: Vfx[] = [];
   shake: [number, number] = [0, 0]; // real-time ms of last hit per side
   flash: [{ color: string; at: number } | null, { color: string; at: number } | null] = [null, null];
   paused = false;
@@ -147,6 +224,8 @@ export class BattleController {
   private realNow = 0;
   private lastReal = -1;
   private scheduled: Scheduled[] = [];
+  /** Board animations from spells still in flight, per side (see deferBoard). */
+  private pendingBoards: [Scheduled[], Scheduled[]] = [[], []];
   private fxId = 1;
   private aiRng: { rng: number };
   private aiNextAt: number | null = null;
@@ -201,6 +280,7 @@ export class BattleController {
       due.forEach((s) => s.run());
     }
     this.fx = this.fx.filter((f) => this.realNow - f.born < FX_LIFETIME);
+    this.vfx = this.vfx.filter((v) => this.realNow - v.born < v.duration);
 
     if (this.state.over && !this.ended) {
       const settled = this.display.every((d) => d.queue.length === 0) && this.scheduled.length === 0;
@@ -273,6 +353,32 @@ export class BattleController {
     this.fx.push({ id: this.fxId++, side, kind, text, color, born: this.realNow });
   }
 
+  private pushVfx(v: Omit<Vfx, 'id' | 'born' | 'duration' | 'power'> & { power?: number; duration?: number }) {
+    this.vfx.push({ power: 0.5, duration: VFX_MS[v.kind], ...v, id: this.fxId++, born: this.realNow });
+  }
+
+  /**
+   * Show a spell's effect on the target board when its projectile arrives. If that board's owner
+   * moves first, play it immediately so animations never run out of order.
+   */
+  private deferBoard(p: PlayerIndex, delay: number, run: () => void) {
+    if (delay <= 0) return run();
+    const entry: Scheduled = { at: this.realNow + delay, run: () => {} };
+    entry.run = () => {
+      this.pendingBoards[p] = this.pendingBoards[p].filter((x) => x !== entry);
+      run();
+    };
+    this.pendingBoards[p].push(entry);
+    this.scheduled.push(entry);
+  }
+
+  private flushBoards(p: PlayerIndex) {
+    const pending = this.pendingBoards[p];
+    if (!pending.length) return;
+    this.scheduled = this.scheduled.filter((s) => !pending.includes(s));
+    [...pending].forEach((s) => s.run());
+  }
+
   private later(delay: number, run: () => void, hpDelta?: Scheduled['hpDelta']) {
     if (!delay || delay <= 0) {
       run();
@@ -333,13 +439,36 @@ export class BattleController {
   }
 
   private handleEvents(events: BattleEvent[]) {
+    // Events after a 'spell' belong to it until the next spell/basic. If it targets the opponent,
+    // everything landing on them waits for the projectile.
+    let flying: { caster: PlayerIndex } | null = null;
     for (const e of events) {
-      const delay = e.delayMs ?? 0;
+      if (e.type === 'spell') {
+        const spell = getCharacter(this.state.players[e.caster].characterId).spells[e.color][e.tier];
+        flying = spell.effects.some((x) => OFFENSIVE.has(x.kind)) ? { caster: e.caster } : null;
+      } else if (e.type === 'basic') {
+        flying = null;
+      }
+      const target = 'target' in e ? e.target : e.type === 'board' && e.external ? e.player : null;
+      const travel = flying && target !== null && target !== flying.caster ? PROJECTILE_MS : 0;
+      const delay = (e.delayMs ?? 0) + travel;
       switch (e.type) {
         case 'board': {
           const frames = e.steps.flatMap(stepToFrames);
-          if (frames.length) this.enqueue(e.player, frames);
-          this.boardSounds(e.player, e.steps, e.external ? delay : 0, e.external);
+          if (!e.external) {
+            this.flushBoards(e.player);
+            if (frames.length) this.enqueue(e.player, frames);
+            this.boardSounds(e.player, e.steps, 0, false);
+            break;
+          }
+          const first = e.steps[0]?.kind;
+          this.deferBoard(e.player, travel ? delay : 0, () => {
+            if (frames.length) this.enqueue(e.player, frames);
+            if (first === 'freeze') this.pushVfx({ kind: 'freeze', side: e.player, color: '#bfeaff' });
+            else if (first === 'shatter') this.pushVfx({ kind: 'shatter', side: e.player, color: '#dff6ff', power: 0.9 });
+            else if (first === 'petrify') this.pushVfx({ kind: 'petrify', side: e.player, color: '#b9a98f' });
+          });
+          this.boardSounds(e.player, e.steps, travel ? delay : 0, true);
           break;
         }
         case 'invalidMove': {
@@ -360,11 +489,25 @@ export class BattleController {
           break; // damage event carries the number
         case 'spell': {
           const ch = getCharacter(this.state.players[e.caster].characterId);
+          const flyingNow = !!flying;
           this.later(delay, () => {
             this.pushFx(e.caster, e.tier === 'ultimate' ? 'ultimate' : 'spell', `${e.name}${e.tier === 'ultimate' ? '!!' : '!'}`, ch.palette.primary);
             this.flash[e.caster] = { color: `var(--gem-${e.color})`, at: this.realNow };
             // Only your casts chime; the opponent's spells are heard when they land on you.
             if (e.caster === 0) audio.play(e.tier === 'ultimate' ? 'ultimate' : 'spell');
+            const ult = e.tier === 'ultimate';
+            if (ult) this.pushVfx({ kind: 'ultimate', side: e.caster, color: ch.palette.primary, label: e.name, theme: ch.id, power: 1 });
+            if (flyingNow) {
+              this.pushVfx({
+                kind: 'projectile',
+                side: (1 - e.caster) as PlayerIndex,
+                from: e.caster,
+                color: gemColor(e.color),
+                gem: e.color,
+                theme: ch.id,
+                power: ult ? 1 : 0.55,
+              });
+            }
           });
           break;
         }
@@ -376,6 +519,9 @@ export class BattleController {
             () => {
               this.pushFx(e.target, 'damage', `-${total}${e.absorbed ? ` (${e.absorbed} blocked)` : ''}`);
               this.shake[e.target] = this.realNow;
+              if (!this.dotLabels.has(e.source) && e.source !== 'basic') {
+                this.pushVfx({ kind: 'impact', side: e.target, color: e.absorbed > e.amount ? '#7fc8ff' : '#ff7a4d', power: Math.min(1, total / 24) });
+              }
               // You hear: your hits on them, and their spells hitting you (not their basic 3-match
               // chip damage). Poison/burn ticks get a soft bubble instead of a hit.
               if (this.dotLabels.has(e.source)) {
@@ -393,6 +539,7 @@ export class BattleController {
             delay,
             () => {
               this.pushFx(e.target, 'heal', `+${e.amount}`);
+              if (e.source !== 'Regen') this.pushVfx({ kind: 'heal', side: e.target, color: '#7dffa8', power: Math.min(1, e.amount / 14) });
               if (e.target === 0 && e.source !== 'Regen') audio.play('heal');
             },
             { p: e.target, hp: -e.amount, shield: 0 },
@@ -403,6 +550,7 @@ export class BattleController {
             delay,
             () => {
               this.pushFx(e.target, 'shield', `+${e.amount} shield`);
+              this.pushVfx({ kind: 'shield', side: e.target, color: '#7fc8ff', power: Math.min(1, e.amount / 12) });
               if (e.target === 0) audio.play('shield');
             },
             { p: e.target, hp: 0, shield: -e.amount },
@@ -412,20 +560,33 @@ export class BattleController {
           this.dotLabels.add(e.status.label);
           this.later(delay, () => {
             this.pushFx(e.target, 'status', e.status.label);
+            if (e.status.kind === 'poison') {
+              const burn = /burn|fire|flame/i.test(e.status.label);
+              this.pushVfx({ kind: burn ? 'burn' : 'poison', side: e.target, color: burn ? '#ff9a3c' : '#9be15d' });
+            } else {
+              this.pushVfx({ kind: 'heal', side: e.target, color: '#b8ff9c', power: 0.35 });
+            }
             if (e.status.kind === 'poison' && e.target === 0) audio.play('poison');
           });
           break;
         case 'stun':
           this.later(delay, () => {
             this.pushFx(e.target, 'stun', 'Stunned!');
+            this.pushVfx({ kind: 'stun', side: e.target, color: '#ffe45c', duration: Math.max(700, Math.min(1600, e.durationMs)) });
             audio.play('stun', { volume: e.target === 0 ? 1 : 0.7 });
           });
           break;
         case 'empower':
-          this.later(delay, () => this.pushFx(e.target, 'status', `Empowered x${e.mult}`));
+          this.later(delay, () => {
+            this.pushFx(e.target, 'status', `Empowered x${e.mult}`);
+            this.pushVfx({ kind: 'empower', side: e.target, color: '#ffd36b' });
+          });
           break;
         case 'cleanse':
-          this.later(delay, () => this.pushFx(e.target, 'heal', 'Cleansed'));
+          this.later(delay, () => {
+            this.pushFx(e.target, 'heal', 'Cleansed');
+            this.pushVfx({ kind: 'cleanse', side: e.target, color: '#e8fff4' });
+          });
           break;
         case 'statusRemoved':
         case 'gameOver':

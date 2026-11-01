@@ -1,4 +1,5 @@
 import { AI_LEVELS, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryFight } from '@magepop/core';
+import { HowToPlay } from '../components/HowToPlay';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { ReactNode, useEffect, useState } from 'react';
 import { Gem } from '../components/Gem';
@@ -26,10 +27,11 @@ export function Logo() {
   );
 }
 
-export type MenuTarget = 'story' | 'quick' | 'endless' | 'pvp' | 'collection' | 'settings';
+export type MenuTarget = 'story' | 'quick' | 'endless' | 'pvp' | 'collection' | 'settings' | 'history';
 
 export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTarget) => void; onQuit?: () => void }) {
   const [confirmQuit, setConfirmQuit] = useState(false);
+  const [howTo, setHowTo] = useState(false);
   const cleared = save.storyCleared.length;
   const next = nextStoryFight(save);
   return (
@@ -60,6 +62,12 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
         <button className="btn mid ghost" onClick={() => go('collection')}>
           Mages <span className="count">{save.unlocked.length}/{CHARACTERS.length}</span>
         </button>
+        <button className="btn mid ghost" onClick={() => go('history')}>
+          History
+        </button>
+        <button className="btn mid ghost" onClick={() => setHowTo(true)}>
+          How to Play
+        </button>
         <button className="btn mid ghost" onClick={() => go('settings')}>
           Settings
         </button>
@@ -69,6 +77,7 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
           </button>
         )}
       </div>
+      {howTo && <HowToPlay onClose={() => setHowTo(false)} />}
       {confirmQuit && onQuit && (
         <div className="overlay" onClick={() => setConfirmQuit(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -287,6 +296,7 @@ export function SettingsScreen({
               setTimeout(() => isFullscreen().then(setFull), 250);
             }}
           />
+          <Toggle label="Spell effects" desc="Projectiles, board auras and ultimate banners." on={st.spellEffects} onChange={(v) => set({ spellEffects: v })} />
           <Toggle label="Screen shake" desc="Health panels shake when a hit lands." on={st.screenShake} onChange={(v) => set({ screenShake: v })} />
           <Toggle label="Combat text" desc="Floating damage, healing and spell names." on={st.combatText} onChange={(v) => set({ combatText: v })} />
           <Toggle label="Battle hints" desc="Show the controls reminder at the top of battles." on={st.battleHints} onChange={(v) => set({ battleHints: v })} />
@@ -474,7 +484,7 @@ export function CharacterSelect({
   );
 }
 
-export function Collection({ save, onBack }: { save: SaveData; onBack: () => void }) {
+export function Collection({ save, onBack, onHistory }: { save: SaveData; onBack: () => void; onHistory?: (mage: string) => void }) {
   const [pick, setPick] = useState(save.unlocked[0]);
   const ch = getCharacter(pick);
   const unlocked = save.unlocked.includes(pick);
@@ -506,6 +516,11 @@ export function Collection({ save, onBack }: { save: SaveData; onBack: () => voi
                 </div>
               </div>
               <MageStatsPanel save={save} id={ch.id} />
+              {onHistory && save.history.some((m) => m.player === ch.id) && (
+                <button className="btn small ghost history-link" onClick={() => onHistory(ch.id)}>
+                  {ch.name}'s match history →
+                </button>
+              )}
               <SpellTable ch={ch} />
             </>
           ) : (
@@ -565,6 +580,20 @@ export interface ResultInfo {
 }
 
 export function ResultScreen({ info }: { info: ResultInfo }) {
+  // R = rematch, Enter = the highlighted button.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const a =
+        e.key === 'r' || e.key === 'R' ? info.actions.find((x) => x.label === 'Rematch') : e.key === 'Enter' ? info.actions.find((x) => x.primary) : undefined;
+      if (a) {
+        e.preventDefault();
+        a.onClick();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [info]);
   return (
     <div className={`screen result-screen ${info.won ? 'win' : 'lose'}`}>
       <h1 className="result-title">{info.title}</h1>
@@ -593,6 +622,7 @@ export function ResultScreen({ info }: { info: ResultInfo }) {
         {info.actions.map((a) => (
           <button key={a.label} className={`btn ${a.primary ? '' : 'ghost'}`} onClick={a.onClick}>
             {a.label}
+            {a.label === 'Rematch' && <kbd className="hotkey">R</kbd>}
           </button>
         ))}
       </div>

@@ -1,4 +1,4 @@
-import { CharacterDef, COLOR_LABEL, describeSpell, GEM_COLORS, GemColor, PlayerState } from '@magepop/core';
+import { CharacterDef, describeSpell, GEM_COLORS, GemColor, PlayerState } from '@magepop/core';
 import { useState } from 'react';
 import type { FloatFx } from '../game/BattleController';
 import { Gem } from './Gem';
@@ -117,12 +117,11 @@ export function SpellLegend({ ch, spotlight = [], compact = false }: { ch: Chara
             </div>
             {hover === c && (
               <div className="legend-tip">
-                <div className="tip-color">{COLOR_LABEL[c]}</div>
                 <p>
-                  <b>4-match · {s.active.name}</b> — {describeSpell(s.active)}
+                  <b>4-match · {s.active.name}</b> — {describeSpell(s.active, ch)}
                 </p>
                 <p>
-                  <b>5+ · {s.ultimate.name}</b> — {describeSpell(s.ultimate)}
+                  <b>5+ · {s.ultimate.name}</b> — {describeSpell(s.ultimate, ch)}
                 </p>
               </div>
             )}
@@ -144,11 +143,11 @@ export function SpellTable({ ch }: { ch: CharacterDef }) {
             <div>
               <div className="st-line">
                 <span className="st-tier">4</span>
-                <b>{s.active.name}</b> — {describeSpell(s.active)}
+                <b>{s.active.name}</b> — {describeSpell(s.active, ch)}
               </div>
               <div className="st-line ult">
                 <span className="st-tier">5+</span>
-                <b>{s.ultimate.name}</b> — {describeSpell(s.ultimate)}
+                <b>{s.ultimate.name}</b> — {describeSpell(s.ultimate, ch)}
               </div>
             </div>
           </div>

@@ -3,6 +3,8 @@ import { STARTER_CHARACTER, STORY, StoryChapter, StoryFight } from '@magepop/cor
 export interface Settings {
   /** Panels shake when hit. */
   screenShake: boolean;
+  /** Projectiles, board auras and ultimate banners. */
+  spellEffects: boolean;
   /** Floating damage / spell text over the boards. */
   combatText: boolean;
   /** Skip intro/outro dialogue when replaying a story fight you've already cleared. */
@@ -30,6 +32,31 @@ export interface MageStats {
   pvp: RecordStats;
 }
 
+export type MatchMode = 'story' | 'quick' | 'endless' | 'pvp';
+
+/** One finished match, for the Match History screen. Newest first in SaveData.history. */
+export interface MatchRecord {
+  /** Epoch ms when the match ended. */
+  at: number;
+  mode: MatchMode;
+  /** e.g. the story fight title or "Wave 3". */
+  detail: string;
+  player: string;
+  opponent: string;
+  /** Bot difficulty name (absent online). */
+  level?: string;
+  result: 'win' | 'loss' | 'forfeit';
+  durationMs: number;
+  damageDealt: number;
+  damageTaken: number;
+  spells: number;
+  ultimates: number;
+  biggestCombo: number;
+  healed: number;
+}
+
+export const HISTORY_LIMIT = 200;
+
 export interface SaveData {
   version: 1;
   unlocked: string[];
@@ -38,6 +65,9 @@ export interface SaveData {
   /** best (fastest) clear time per story fight, in ms */
   storyBest: Record<string, number>;
   endlessBest: { wave: number; characterId: string } | null;
+  /** Has seen the How to Play guide (shown before the first battle). */
+  seenHowToPlay: boolean;
+  history: MatchRecord[];
   /** Per-mage records, keyed by character id. */
   mageStats: Record<string, MageStats>;
   settings: Settings;
@@ -49,6 +79,7 @@ const LEGACY_KEY = 'taiwanpop.save.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   screenShake: true,
+  spellEffects: true,
   combatText: true,
   skipReplayDialogue: false,
   battleHints: true,
@@ -63,6 +94,8 @@ const fresh = (): SaveData => ({
   storyBest: {},
   endlessBest: null,
   mageStats: {},
+  seenHowToPlay: false,
+  history: [],
   settings: { ...DEFAULT_SETTINGS },
 });
 
@@ -76,6 +109,9 @@ export function loadSave(): SaveData {
       ...data,
       storyBest: data.storyBest ?? {},
       mageStats: data.mageStats ?? {},
+      history: data.history ?? [],
+      // Players from before the guide existed who've already won fights don't need it forced on them.
+      seenHowToPlay: data.seenHowToPlay ?? (data.storyCleared?.length ?? 0) > 0,
       settings: { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) },
       unlocked: Array.from(new Set([STARTER_CHARACTER, ...(data.unlocked ?? [])])),
     } as SaveData;
@@ -143,6 +179,12 @@ export function recordMatch(
     r.losses++;
   }
   const next = { ...save, mageStats: { ...save.mageStats, [characterId]: { ...cur, [kind]: r } } };
+  writeSave(next);
+  return next;
+}
+
+export function addHistory(save: SaveData, rec: MatchRecord): SaveData {
+  const next = { ...save, history: [rec, ...save.history].slice(0, HISTORY_LIMIT) };
   writeSave(next);
   return next;
 }

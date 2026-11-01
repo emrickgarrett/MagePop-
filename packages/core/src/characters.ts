@@ -160,7 +160,7 @@ export const CHARACTERS: CharacterDef[] = [
         ultimate: { name: 'Supercell', effects: [{ kind: 'empower', mult: 1.6, charges: 2 }, { kind: 'damage', amount: 5 }] },
       },
       amethyst: {
-        active: { name: 'Polarity', effects: [{ kind: 'convert', count: 4, to: 'topaz' }], flavor: 'Rewires your own gems into Topaz.' },
+        active: { name: 'Polarity', effects: [{ kind: 'convert', count: 4, to: 'topaz' }], flavor: 'Rewires your own gems into Sparks.' },
         ultimate: { name: 'Magnetic Storm', effects: [{ kind: 'convert', count: 7, to: 'topaz' }, { kind: 'damage', amount: 4 }] },
       },
       emerald: {

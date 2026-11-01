@@ -1,8 +1,12 @@
-import { COLOR_LABEL, Effect, SpellTier } from './types';
+import { CharacterDef, Effect, SpellTier } from './types';
 
 const sec = (ms: number) => `${+(ms / 1000).toFixed(1)}s`;
 
-export function describeEffect(e: Effect): string {
+/**
+ * Rules text for a spell. Pass the caster so gem references read as that mage's spell names
+ * ("Spark gems") instead of colors, since every mage's gems look different.
+ */
+export function describeEffect(e: Effect, ch?: CharacterDef): string {
   switch (e.kind) {
     case 'damage':
       return `Deal ${e.amount} damage`;
@@ -31,7 +35,9 @@ export function describeEffect(e: Effect): string {
     case 'empower':
       return `Next ${e.charges > 1 ? `${e.charges} damage spells deal` : 'damage spell deals'} x${e.mult} damage`;
     case 'convert':
-      return `Convert ${e.count} of your gems to ${COLOR_LABEL[e.to]}`;
+      return ch
+        ? `Turn ${e.count} of your gems into ${ch.spells[e.to].active.name} gems`
+        : `Turn ${e.count} of your gems into ${e.to} gems`;
     case 'cleanse':
       return 'Cleanse your poisons, ice and stone';
     case 'damageIfPoisoned':
@@ -39,6 +45,6 @@ export function describeEffect(e: Effect): string {
   }
 }
 
-export function describeSpell(t: SpellTier): string {
-  return t.effects.map(describeEffect).join('. ') + '.';
+export function describeSpell(t: SpellTier, ch?: CharacterDef): string {
+  return t.effects.map((e) => describeEffect(e, ch)).join('. ') + '.';
 }

@@ -11,11 +11,13 @@ interface Props {
   onMove?: (a: Pos, b: Pos) => void;
   stunned?: boolean;
   label?: string;
-  /** Champion id whose gem set to draw. */
+  /** Mage id whose gem set to draw. */
   theme?: string;
+  /** A suggested swap to highlight (idle hint). */
+  hint?: { a: Pos; b: Pos } | null;
 }
 
-export function BoardView({ frame, engineTime, cell, interactive, onMove, stunned, label, theme }: Props) {
+export function BoardView({ frame, engineTime, cell, interactive, onMove, stunned, label, theme, hint }: Props) {
   const { board } = frame;
   const [selected, setSelected] = useState<Pos | null>(null);
   const drag = useRef<{ start: Pos; x: number; y: number; done: boolean } | null>(null);
@@ -89,6 +91,7 @@ export function BoardView({ frame, engineTime, cell, interactive, onMove, stunne
         const drop = frame.drops.get(g.id);
         const frozen = g.frozenUntil > engineTime;
         const isSel = selected && selected.r === r && selected.c === c;
+        const isHint = !!hint && ((hint.a.r === r && hint.a.c === c) || (hint.b.r === r && hint.b.c === c));
         const slotStyle: CSSProperties = {
           transform: `translate(${c * cell}px, ${r * cell}px)`,
           transition: frame.moveMs ? `transform ${frame.moveMs}ms cubic-bezier(.35,.1,.45,1.25)` : 'none',
@@ -98,7 +101,7 @@ export function BoardView({ frame, engineTime, cell, interactive, onMove, stunne
         const innerStyle = drop ? ({ '--drop': `${-drop * cell}px`, animationDuration: `${frame.durationMs}ms` } as CSSProperties) : undefined;
         return (
           <div key={g.id} className="gem-slot" style={slotStyle}>
-            <div className={`gem-inner ${drop ? 'dropping' : ''} ${fx ? `fx-${fx}` : ''} ${isSel ? 'selected' : ''}`} style={innerStyle}>
+            <div className={`gem-inner ${drop ? 'dropping' : ''} ${fx ? `fx-${fx}` : ''} ${isSel ? 'selected' : ''} ${isHint && !isSel ? 'hinted' : ''}`} style={innerStyle}>
               <Gem kind={g.kind} size={cell * 0.86} theme={theme} />
               {frozen && <div className="ice" />}
             </div>
