@@ -11,6 +11,12 @@ import {
   aiLevel,
   BattleEvent,
   BattleState,
+  cloneBoard,
+  findGroups,
+  isAdjacent,
+  isSwappable,
+  swapCells,
+  TIMING,
   ClientMessage,
   eventsForSeat,
   isCharacterId,
@@ -26,7 +32,8 @@ import {
   ServerMessage,
   stateForSeat,
 } from '@magepop/core';
-import { BattleController, BattleResult } from './BattleController';
+import { audio } from './audio';
+import { BattleController, BattleResult, Frame } from './BattleController';
 
 /** Where to play: set in vite.config.ts (also feeds the Content Security Policy). */
 declare const __PVP_SERVER__: string;
@@ -128,6 +135,9 @@ export class PvpLink {
   private name = 'Mage';
   private resumeToken: string | null = null;
   private reconnectUntil = 0;
+  /** Smoothed round-trip time to the server in ms (null until measured). */
+  rtt: number | null = null;
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
   private listeners = new Set<(m: ServerMessage) => void>();
   private statusListeners = new Set<() => void>();
 
@@ -179,6 +189,7 @@ export class PvpLink {
       if (!msg) return;
       if (msg.t === 'welcome' && !welcomed) {
         welcomed = true;
+        this.startPing();
         onWelcome();
       }
       this.route(msg);
@@ -186,6 +197,7 @@ export class PvpLink {
     ws.onclose = () => {
       if (this.ws !== ws) return;
       this.ws = null;
+      this.stopPing();
       if (!welcomed) {
         if (this.status === 'reconnecting') return this.retryLater();
         this.setStatus('closed', this.error ?? "Couldn't reach the server. Check your connection and try again.");
@@ -225,6 +237,11 @@ export class PvpLink {
       case 'rematch':
         this.rematchStatus = msg.status;
         break;
+      case 'pong': {
+        const sample = performance.now() - msg.at;
+        if (sample >= 0 && sample < 30_000) this.rtt = this.rtt === null ? sample : this.rtt * 0.7 + sample * 0.3;
+        break;
+      }
       case 'matchFound':
         this.resumeToken = msg.resumeToken;
         this.roomCode = null;
@@ -267,6 +284,20 @@ export class PvpLink {
     this.listeners.forEach((f) => f(msg));
   }
 
+  /** Measure latency every 2s while connected (well inside the server's rate limit). */
+  private startPing() {
+    this.stopPing();
+    this.rtt = null;
+    const ping = () => this.send({ t: 'ping', at: performance.now() });
+    ping();
+    this.pingTimer = setInterval(ping, 2000);
+  }
+
+  private stopPing() {
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    this.pingTimer = null;
+  }
+
   send(msg: ClientMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
@@ -304,6 +335,7 @@ export class PvpLink {
   }
 
   close() {
+    this.stopPing();
     this.resumeToken = null;
     this.roomCode = null;
     const ws = this.ws;
@@ -332,6 +364,10 @@ export class NetBattleController extends BattleController {
   opponentGraceUntil: number | null = null;
   private serverTime: number;
   private seq = 0;
+  /**
+   * The swap we've sent and are waiting on. It's already drawn (optimistic), so when the server's
+   * answer arrives we skip redrawing the swap, or slide the gems back if it was rejected.
+   */
   private pending: { seq: number; since: number } | null = null;
   private endReason: MatchEndReason | undefined;
   private unsub: () => void;
@@ -363,19 +399,50 @@ export class NetBattleController extends BattleController {
 
   /** Between server messages, keep the clock moving (capped so it can't run far ahead). */
   protected override simulate(dt: number) {
+    // No answer to our swap (dropped message, or the match just ended): put the board back.
+    if (this.pending && performance.now() - this.pending.since > 2000) {
+      this.pending = null;
+      this.snapBack();
+    }
     if (this.state.over || performance.now() < this.startsAtReal) return;
     this.state.time = Math.min(this.state.time + dt, this.serverTime + 400);
   }
 
   override canAct(p: PlayerIndex = 0): boolean {
-    if (this.pending && performance.now() - this.pending.since > 1500) this.pending = null;
     return !this.pending && !this.reconnecting && performance.now() >= this.startsAtReal && super.canAct(p);
   }
 
+  /**
+   * Swaps animate instantly. We check the swap against our copy of the board: if it can't make a
+   * match it bounces back right away and is never sent. Otherwise the swap is drawn now and sent;
+   * the server (the only authority) answers with the result.
+   */
   override humanMove(a: Pos, b: Pos) {
     if (!this.canAct(0)) return;
+    const board = this.state.players[0].board;
+    const t = this.state.time;
+    const cell = (q: Pos) => board.cells[q.r * board.cols + q.c] ?? null;
+    const inside = (q: Pos) => q.r >= 0 && q.c >= 0 && q.r < board.rows && q.c < board.cols;
+    if (!inside(a) || !inside(b) || !isAdjacent(a, b) || !isSwappable(cell(a), t) || !isSwappable(cell(b), t)) return;
+    const swapped = cloneBoard(board);
+    swapCells(swapped, a, b);
+    if (findGroups(swapped).length === 0) {
+      this.bounce(0, a, b);
+      return;
+    }
+    this.enqueue(0, [this.frameOf(swapped, TIMING.swapMs)]);
+    audio.play('swap');
     this.pending = { seq: ++this.seq, since: performance.now() };
     this.link.send({ t: 'move', a, b, seq: this.seq });
+  }
+
+  private frameOf(board: Frame['board'], ms: number): Frame {
+    return { board: cloneBoard(board), marks: new Map(), drops: new Map(), durationMs: ms, moveMs: ms };
+  }
+
+  /** Slide your board back to what the server says it is. */
+  private snapBack() {
+    this.enqueue(0, [this.frameOf(this.state.players[0].board, TIMING.swapMs)]);
   }
 
   forfeit() {
@@ -388,6 +455,24 @@ export class NetBattleController extends BattleController {
 
   dispose() {
     this.unsub();
+  }
+
+  /**
+   * The server's answer to our swap. Accepted: drop the swap step (we already drew it) and play
+   * the rest. Rejected (e.g. a freeze landed on that gem first): slide the gems back.
+   */
+  private reconcile(events: BattleEvent[], swapShown: number): BattleEvent[] {
+    const rejected = events.some((e) => e.type === 'invalidMove' && e.player === 0);
+    if (rejected) {
+      this.snapBack();
+      audio.play('invalid');
+      return events.filter((e) => !(e.type === 'invalidMove' && e.player === 0));
+    }
+    // Popups are timed from the start of the swap; part of it has already played on screen.
+    return events.map((e) => {
+      if (e.type === 'board' && e.player === 0 && !e.external && e.steps[0]?.kind === 'swap') return { ...e, steps: e.steps.slice(1) };
+      return e.delayMs ? { ...e, delayMs: Math.max(0, e.delayMs - swapShown) } : e;
+    });
   }
 
   private setPlayers(players: [PlayerState, PlayerState]) {
@@ -405,8 +490,13 @@ export class NetBattleController extends BattleController {
         this.state.time = m.time;
         // Apply the new state first so HP bars hold back until hits land, as offline.
         if (m.players) this.setPlayers(m.players);
-        if (m.ackSeq !== undefined && this.pending?.seq === m.ackSeq) this.pending = null;
-        if (m.events.length) this.handleEvents(eventsForSeat(m.events, this.you));
+        let events = eventsForSeat(m.events, this.you);
+        if (m.ackSeq !== undefined && this.pending?.seq === m.ackSeq) {
+          const swapShown = Math.min(TIMING.swapMs, performance.now() - this.pending.since);
+          this.pending = null;
+          events = this.reconcile(events, swapShown);
+        }
+        if (events.length) this.handleEvents(events);
         break;
       }
       case 'resumed': {
@@ -415,6 +505,12 @@ export class NetBattleController extends BattleController {
         this.state.time = s.time;
         this.setPlayers(m.state.players);
         this.pending = null;
+        // We may have missed animations while away: jump both boards to the real state.
+        for (const p of [0, 1] as const) {
+          this.display[p].queue.length = 0;
+          this.display[p].frame = this.frameOf(this.state.players[p].board, 0);
+          this.display[p].elapsed = 0;
+        }
         break;
       }
       case 'opponentConnection':

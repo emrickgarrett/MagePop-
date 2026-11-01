@@ -2825,3 +2825,25 @@ small {
 .btn.alt3 small {
   color: #f1e4ff;
 }
+
+/* Online latency badge in the battle header */
+.ping {
+  margin-left: 12px;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-dim);
+  vertical-align: middle;
+}
+.ping.good {
+  color: #7dffa8;
+}
+.ping.ok {
+  color: #ffd36b;
+}
+.ping.bad {
+  color: #ff8a9b;
+}

@@ -5,7 +5,7 @@ import { CalloutStage, PlayerPanel, SpellLegend } from '../components/Hud';
 import { SpellFxLayer } from '../components/SpellFx';
 import { HowToPlay } from '../components/HowToPlay';
 import { BattleController, BattleResult, BattleSetup } from '../game/BattleController';
-import { NetBattleController } from '../game/pvp';
+import { NetBattleController, pvp } from '../game/pvp';
 import type { Settings } from '../game/save';
 import { themedBoardSrc } from '../game/themes';
 import { audio } from '../game/audio';
@@ -27,6 +27,19 @@ function useCellSize() {
 }
 
 const COUNTDOWN_MS = 1600;
+
+/** Online only: round-trip time to the server (the battle screen re-renders every frame). */
+function PingBadge() {
+  const ms = pvp.rtt;
+  if (pvp.status === 'reconnecting') return <span className="ping bad">● offline</span>;
+  if (ms === null) return <span className="ping">● … ms</span>;
+  const cls = ms < 90 ? 'good' : ms < 170 ? 'ok' : 'bad';
+  return (
+    <span className={`ping ${cls}`} title="Round trip to the game server">
+      ● {Math.round(ms)} ms
+    </span>
+  );
+}
 /** Show a suggested swap after this long without moving. */
 const HINT_AFTER_MS = 8000;
 
@@ -155,7 +168,10 @@ export function BattleScreen({
   return (
     <div className="battle-screen" ref={rootRef}>
       <div className="battle-top">
-        <div className="battle-header">{header}</div>
+        <div className="battle-header">
+          {header}
+          {online && <PingBadge />}
+        </div>
         <div className="battle-hint">{settings.battleHints ? `Drag or click gems to swap · Esc for ${online ? 'menu' : 'pause'}` : ''}</div>
         <button
           className="btn small ghost"

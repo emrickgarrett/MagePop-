@@ -330,6 +330,19 @@ export class BattleController {
     }
   }
 
+  /** Gems slide toward each other and back: a swap that makes no match. */
+  protected bounce(p: PlayerIndex, a: Pos, b: Pos) {
+    const base = this.display[p].frame.board;
+    const swapped = cloneBoard(base);
+    swapCells(swapped, a, b);
+    const half = TIMING.invalidMs / 2;
+    this.enqueue(p, [
+      { board: swapped, marks: new Map(), drops: new Map(), durationMs: half, moveMs: half },
+      { board: cloneBoard(base), marks: new Map(), drops: new Map(), durationMs: half, moveMs: half },
+    ]);
+    if (p === 0) audio.play('invalid');
+  }
+
   /** Advance the battle itself. Local: run the engine and the bot. Online: the server does this. */
   protected simulate(dt: number) {
     if (!this.state.over) this.handleEvents(tick(this.state, dt));
@@ -390,7 +403,7 @@ export class BattleController {
     if (!d.queue.length && d.elapsed >= d.frame.durationMs) d.elapsed = d.frame.durationMs;
   }
 
-  private enqueue(p: PlayerIndex, frames: Frame[]) {
+  protected enqueue(p: PlayerIndex, frames: Frame[]) {
     const d = this.display[p];
     if (d.queue.length === 0 && d.elapsed >= d.frame.durationMs) {
       // Idle: start immediately.
@@ -528,17 +541,7 @@ export class BattleController {
           break;
         }
         case 'invalidMove': {
-          if (e.reason === 'noMatch') {
-            const base = this.display[e.player].frame.board;
-            const swapped = cloneBoard(base);
-            swapCells(swapped, e.a, e.b);
-            const half = TIMING.invalidMs / 2;
-            this.enqueue(e.player, [
-              { board: swapped, marks: new Map(), drops: new Map(), durationMs: half, moveMs: half },
-              { board: cloneBoard(base), marks: new Map(), drops: new Map(), durationMs: half, moveMs: half },
-            ]);
-            if (e.player === 0) audio.play('invalid');
-          }
+          if (e.reason === 'noMatch') this.bounce(e.player, e.a, e.b);
           break;
         }
         case 'basic':
