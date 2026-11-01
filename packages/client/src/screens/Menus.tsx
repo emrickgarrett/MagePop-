@@ -5,8 +5,8 @@ import { Gem } from '../components/Gem';
 import { Portrait, SpellTable } from '../components/Hud';
 import { audio } from '../game/audio';
 import { isDesktop, isFullscreen, setFullscreen } from '../game/platform';
-import { fightAvailable, formatTime, nextStoryFight, TOTAL_STORY_FIGHTS } from '../game/save';
-import type { SaveData, Settings } from '../game/save';
+import { fightAvailable, formatTime, mageStatsOf, nextStoryFight, TOTAL_STORY_FIGHTS } from '../game/save';
+import type { RecordStats, SaveData, Settings } from '../game/save';
 
 export function Logo() {
   return (
@@ -45,7 +45,7 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
         </button>
         <button className="btn big alt" onClick={() => go('quick')}>
           Quick Battle
-          <small>Any champion vs any bot</small>
+          <small>Any mage vs any bot</small>
         </button>
         <button className="btn big alt2" onClick={() => go('endless')}>
           Endless
@@ -58,7 +58,7 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
       </div>
       <div className="menu-row">
         <button className="btn mid ghost" onClick={() => go('collection')}>
-          Champions <span className="count">{save.unlocked.length}/{CHARACTERS.length}</span>
+          Mages <span className="count">{save.unlocked.length}/{CHARACTERS.length}</span>
         </button>
         <button className="btn mid ghost" onClick={() => go('settings')}>
           Settings
@@ -306,7 +306,7 @@ export function SettingsScreen({
             <div>
               <div className="setting-label">Reset progress</div>
               <div className="setting-desc">
-                Erases story progress, unlocked champions and Endless records. Settings are kept.
+                Erases story progress, unlocked mages, mage stats and Endless records. Settings are kept.
                 {resetDone && <b className="reset-done"> Progress reset.</b>}
               </div>
             </div>
@@ -404,7 +404,7 @@ export function CharacterSelect({
     <ScreenFrame title={mode === 'quick' ? 'Quick Battle' : 'Endless'} onBack={onBack}>
       <div className="select-layout">
         <div>
-          <h4>Your champion</h4>
+          <h4>Your mage</h4>
           <div className="char-grid">
             {CHARACTERS.map((c) => {
               const un = save.unlocked.includes(c.id);
@@ -441,7 +441,7 @@ export function CharacterSelect({
           )}
           {mode === 'endless' && (
             <p className="muted endless-rules">
-              Fight random champions back to back. Your HP carries over, with 25% restored after each win. Bots get tougher every two waves.
+              Fight random mages back to back. Your HP carries over, with 25% restored after each win. Bots get tougher every two waves.
               {save.endlessBest && ` Your best: wave ${save.endlessBest.wave}.`}
             </p>
           )}
@@ -479,7 +479,7 @@ export function Collection({ save, onBack }: { save: SaveData; onBack: () => voi
   const ch = getCharacter(pick);
   const unlocked = save.unlocked.includes(pick);
   return (
-    <ScreenFrame title="Champions" onBack={onBack}>
+    <ScreenFrame title="Mages" onBack={onBack}>
       <div className="select-layout">
         <div className="char-grid tall">
           {CHARACTERS.map((c) => {
@@ -505,17 +505,53 @@ export function Collection({ save, onBack }: { save: SaveData; onBack: () => voi
                   <p className="muted">{ch.blurb}</p>
                 </div>
               </div>
+              <MageStatsPanel save={save} id={ch.id} />
               <SpellTable ch={ch} />
             </>
           ) : (
             <div className="locked-detail">
               <Portrait ch={ch} size={110} locked />
-              <p>Locked. Clear {getCharacter(STORY.find((s) => s.unlocks === ch.id)?.hero ?? 'ember').name}'s story chapter to recruit this champion.</p>
+              <p>Locked. Clear {getCharacter(STORY.find((s) => s.unlocks === ch.id)?.hero ?? 'ember').name}'s story chapter to recruit this mage.</p>
             </div>
           )}
         </div>
       </div>
     </ScreenFrame>
+  );
+}
+
+function RecordRow({ label, rec, note }: { label: string; rec: RecordStats; note?: string }) {
+  const games = rec.wins + rec.losses;
+  const cells = [
+    { l: 'Games', v: String(games) },
+    { l: 'Wins', v: String(rec.wins) },
+    { l: 'Losses', v: String(rec.losses) },
+    { l: 'Win rate', v: games ? `${Math.round((rec.wins / games) * 100)}%` : '–' },
+    { l: 'Fastest win', v: rec.fastestWinMs !== null ? formatTime(rec.fastestWinMs) : '–' },
+  ];
+  return (
+    <div className={`mage-record ${note ? 'pending' : ''}`}>
+      <div className="mr-label">
+        {label}
+        {note && <small>{note}</small>}
+      </div>
+      {cells.map((c) => (
+        <div key={c.l} className="mr-cell">
+          <div className="mr-v">{c.v}</div>
+          <div className="mr-l">{c.l}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MageStatsPanel({ save, id }: { save: SaveData; id: string }) {
+  const st = mageStatsOf(save, id);
+  return (
+    <div className="mage-stats">
+      <RecordRow label="vs Bots" rec={st.bots} />
+      <RecordRow label="Online" rec={st.pvp} note={st.pvp.wins + st.pvp.losses ? undefined : 'coming soon'} />
+    </div>
   );
 }
 
@@ -537,7 +573,7 @@ export function ResultScreen({ info }: { info: ResultInfo }) {
         <div className="unlock-banner">
           <Portrait ch={getCharacter(info.unlocked)} size={96} />
           <div>
-            <div className="muted">New champion unlocked!</div>
+            <div className="muted">New mage unlocked!</div>
             <h3>
               {getCharacter(info.unlocked).name} {getCharacter(info.unlocked).title}
             </h3>

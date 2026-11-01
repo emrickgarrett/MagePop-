@@ -89,7 +89,7 @@ const FLAVOR: Record<string, { title: string; lines: [string, string, string][] 
   volt: {
     title: 'Eye of the Storm',
     lines: [
-      ['Five champions, one Academy, and I\'m the fastest. Let\'s prove it.', 'Wait, I\'m not ready—', 'Too slow!'],
+      ['Five mages, one Academy, and I\'m the fastest. Let\'s prove it.', 'Wait, I\'m not ready—', 'Too slow!'],
       ['Overcharge, then hit. Rewire my board for combos. Chaos is a ladder.', 'You can\'t keep this pace forever!', 'Watch me.'],
       ['Final exam: Ember, the one who started all this. At full power.', 'You\'ve all grown so much. Show me everything!', 'The Academy has a new champion... for now.'],
     ],

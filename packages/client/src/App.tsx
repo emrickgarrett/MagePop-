@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { audio, MusicTrack } from './game/audio';
 import { BattleResult, BattleSetup } from './game/BattleController';
 import { isDesktop, quitApp } from './game/platform';
-import { clearStoryFight, formatTime, loadSave, resetProgress, SaveData, Settings, writeSave } from './game/save';
+import { clearStoryFight, formatTime, loadSave, recordMatch, resetProgress, SaveData, Settings, writeSave } from './game/save';
 import { BattleScreen } from './screens/BattleScreen';
 import { CharacterSelect, Collection, DialogueScreen, MainMenu, PvpComingSoon, ResultInfo, ResultScreen, SettingsScreen, StoryMap } from './screens/Menus';
 
@@ -261,8 +261,15 @@ export function App() {
           header={screen.header}
           spotlight={screen.spotlight}
           settings={save.settings}
-          onEnd={screen.onEnd}
-          onQuit={menu}
+          onEnd={(r) => {
+            // Record first: the mode's own handler builds on the latest save.
+            setSave(recordMatch(saveRef.current, screen.setup.player, 'bots', { won: r.won, durationMs: r.durationMs }));
+            screen.onEnd(r);
+          }}
+          onQuit={() => {
+            setSave(recordMatch(saveRef.current, screen.setup.player, 'bots', { won: false }));
+            menu();
+          }}
         />
       );
     case 'result':

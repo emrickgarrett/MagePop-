@@ -1820,3 +1820,46 @@ small {
   font-size: 12px;
   opacity: 0.45;
 }
+
+/* ---- Mage records (Mages screen) ---- */
+.mage-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.mage-record {
+  display: grid;
+  grid-template-columns: 110px repeat(5, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--panel);
+}
+.mage-record.pending {
+  opacity: 0.5;
+}
+.mr-label {
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  flex-direction: column;
+}
+.mr-label small {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.mr-cell {
+  text-align: center;
+}
+.mr-v {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 20px;
+}
+.mr-l {
+  font-size: 11px;
+  color: var(--ink-dim);
+}

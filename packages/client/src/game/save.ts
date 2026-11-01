@@ -15,6 +15,21 @@ export interface Settings {
   sfxVolume: number;
 }
 
+/** Win/loss record for one mage in one kind of match. */
+export interface RecordStats {
+  wins: number;
+  losses: number;
+  /** Fastest win, in ms. */
+  fastestWinMs: number | null;
+}
+
+export interface MageStats {
+  /** Every fight against a bot: Story, Quick Battle and Endless. */
+  bots: RecordStats;
+  /** Online matches (once Multiplayer launches). */
+  pvp: RecordStats;
+}
+
 export interface SaveData {
   version: 1;
   unlocked: string[];
@@ -23,6 +38,8 @@ export interface SaveData {
   /** best (fastest) clear time per story fight, in ms */
   storyBest: Record<string, number>;
   endlessBest: { wave: number; characterId: string } | null;
+  /** Per-mage records, keyed by character id. */
+  mageStats: Record<string, MageStats>;
   settings: Settings;
 }
 
@@ -45,6 +62,7 @@ const fresh = (): SaveData => ({
   storyCleared: [],
   storyBest: {},
   endlessBest: null,
+  mageStats: {},
   settings: { ...DEFAULT_SETTINGS },
 });
 
@@ -57,6 +75,7 @@ export function loadSave(): SaveData {
       ...fresh(),
       ...data,
       storyBest: data.storyBest ?? {},
+      mageStats: data.mageStats ?? {},
       settings: { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) },
       unlocked: Array.from(new Set([STARTER_CHARACTER, ...(data.unlocked ?? [])])),
     } as SaveData;
@@ -97,6 +116,35 @@ export function clearStoryFight(save: SaveData, fightId: string, timeMs: number)
   const next = { ...save, storyCleared, storyBest, unlocked: [...unlockedSet] };
   writeSave(next);
   return { save: next, unlocked, newBest: newBest && prevBest !== undefined };
+}
+
+const emptyRecord = (): RecordStats => ({ wins: 0, losses: 0, fastestWinMs: null });
+
+export function mageStatsOf(save: SaveData, characterId: string): MageStats {
+  const s = save.mageStats[characterId];
+  return { bots: s?.bots ?? emptyRecord(), pvp: s?.pvp ?? emptyRecord() };
+}
+
+/** Record a finished match (a forfeit counts as a loss). */
+export function recordMatch(
+  save: SaveData,
+  characterId: string,
+  kind: keyof MageStats,
+  result: { won: boolean; durationMs?: number },
+): SaveData {
+  const cur = mageStatsOf(save, characterId);
+  const r = { ...cur[kind] };
+  if (result.won) {
+    r.wins++;
+    if (result.durationMs !== undefined && (r.fastestWinMs === null || result.durationMs < r.fastestWinMs)) {
+      r.fastestWinMs = Math.round(result.durationMs);
+    }
+  } else {
+    r.losses++;
+  }
+  const next = { ...save, mageStats: { ...save.mageStats, [characterId]: { ...cur, [kind]: r } } };
+  writeSave(next);
+  return next;
 }
 
 // ---- Story progress helpers ------------------------------------------------
