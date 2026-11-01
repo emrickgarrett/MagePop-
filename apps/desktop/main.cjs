@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -35,6 +35,51 @@ function createWindow() {
 }
 
 ipcMain.on('app:quit', () => app.quit());
+
+// ---- Auto-update ------------------------------------------------------------
+// Checks the GitHub Releases page for a newer *published* version (drafts are invisible to players).
+// Windows installer + Linux AppImage download in the background and install on restart.
+// macOS (unsigned builds can't self-update) and the Windows portable exe just get a "download" link.
+const RELEASES_URL = 'https://github.com/emrickgarrett/MagePop-/releases/latest';
+let updateState = { status: 'idle' };
+const canSelfUpdate = process.platform !== 'darwin' && !process.env.PORTABLE_EXECUTABLE_DIR;
+
+function sendUpdate(state) {
+  updateState = state;
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('update:state', state);
+}
+
+function startUpdater() {
+  if (!app.isPackaged) return;
+  let autoUpdater;
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+  } catch (err) {
+    console.error('electron-updater unavailable', err);
+    return;
+  }
+  autoUpdater.autoDownload = canSelfUpdate;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('update-available', (info) =>
+    sendUpdate({ status: canSelfUpdate ? 'downloading' : 'available', version: info.version, percent: 0 }),
+  );
+  autoUpdater.on('download-progress', (p) =>
+    sendUpdate({ ...updateState, status: 'downloading', percent: Math.round(p.percent) }),
+  );
+  autoUpdater.on('update-downloaded', (info) => sendUpdate({ status: 'ready', version: info.version }));
+  autoUpdater.on('error', (err) => console.error('update check failed', err?.message ?? err)); // offline etc: stay quiet
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  check();
+  setInterval(check, 60 * 60 * 1000); // and hourly for long sessions
+
+  ipcMain.on('update:install', () => {
+    if (updateState.status === 'ready') autoUpdater.quitAndInstall();
+  });
+}
+
+ipcMain.handle('app:version', () => app.getVersion());
+ipcMain.handle('update:get', () => updateState);
+ipcMain.on('update:openPage', () => shell.openExternal(RELEASES_URL));
 ipcMain.on('window:setFullscreen', (e, on) => BrowserWindow.fromWebContents(e.sender)?.setFullScreen(!!on));
 ipcMain.handle('window:isFullscreen', (e) => !!BrowserWindow.fromWebContents(e.sender)?.isFullScreen());
 
@@ -44,6 +89,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 Menu.setApplicationMenu(null);
 app.whenReady().then(() => {
   createWindow();
+  startUpdater();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

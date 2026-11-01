@@ -1,6 +1,6 @@
 {
   "name": "@magepop/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MagePop!: a match-3 spell-duel game",
   "main": "main.cjs",
@@ -85,5 +85,8 @@
     }
   },
   "author": "Taiwan (emrickgarrett)",
-  "homepage": "https://github.com/emrickgarrett/MagePop-"
+  "homepage": "https://github.com/emrickgarrett/MagePop-",
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
 }

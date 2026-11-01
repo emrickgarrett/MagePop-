@@ -1,4 +1,5 @@
 import { AI_LEVELS, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryFight } from '@magepop/core';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { ReactNode, useEffect, useState } from 'react';
 import { Gem } from '../components/Gem';
 import { Portrait, SpellTable } from '../components/Hud';
@@ -33,6 +34,7 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
   const next = nextStoryFight(save);
   return (
     <div className="screen menu-screen">
+      <UpdateBanner />
       <Logo />
       <div className="menu-buttons">
         <button className="btn big" onClick={() => go('story')}>

@@ -1786,3 +1786,37 @@ small {
   font-weight: 700;
   color: var(--ink-dim);
 }
+
+/* ---- Update notice (main menu) ---- */
+.update-corner {
+  position: fixed;
+  right: 18px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 20;
+}
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(20, 8, 45, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+.update-banner.ready {
+  border-color: #ffd36b;
+  animation: update-pop 0.35s ease-out;
+}
+@keyframes update-pop {
+  from { transform: translateY(12px); opacity: 0; }
+}
+.version-tag {
+  font-size: 12px;
+  opacity: 0.45;
+}
