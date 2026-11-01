@@ -77,7 +77,9 @@ function startUpdater() {
   });
 }
 
-ipcMain.handle('app:version', () => app.getVersion());
+// Released builds get their version from the git tag (see .github/workflows/release.yml).
+// Local runs say "-dev" so they can't be mistaken for a release.
+ipcMain.handle('app:version', () => (app.isPackaged ? app.getVersion() : `${app.getVersion()}-dev`));
 ipcMain.handle('update:get', () => updateState);
 ipcMain.on('update:openPage', () => shell.openExternal(RELEASES_URL));
 ipcMain.on('window:setFullscreen', (e, on) => BrowserWindow.fromWebContents(e.sender)?.setFullScreen(!!on));
