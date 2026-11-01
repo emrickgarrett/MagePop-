@@ -2255,3 +2255,203 @@ small {
   margin: -6px 0 14px auto;
   display: block;
 }
+
+/* ---- Achievements ---- */
+.menu-row {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.ach {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+.ach-summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 22px;
+  border-radius: 18px;
+  background: var(--panel);
+  text-align: center;
+}
+.ach-big {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 30px;
+}
+.ach-big span {
+  font-size: 18px;
+  color: var(--ink-dim);
+}
+.ach-big.gold {
+  color: #ffd36b;
+}
+.ach-bar {
+  height: 12px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.ach-bar > div {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #ff5fa2, #ffd36b);
+}
+.ach-bar.small {
+  height: 6px;
+  flex: 1;
+}
+.ach-cats {
+  align-self: flex-start;
+  flex-wrap: wrap;
+}
+.ach-cats small {
+  opacity: 0.6;
+  font-weight: 400;
+}
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 4px;
+  max-height: calc(100vh - 300px);
+  align-content: start;
+}
+.ach-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--panel);
+  opacity: 0.62;
+}
+.ach-card.earned {
+  opacity: 1;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--tier) 16%, transparent), var(--panel) 60%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier) 35%, transparent);
+}
+.ach-card.bronze,
+.medal.bronze,
+.ach-toast.bronze {
+  --tier: #e09a5b;
+}
+.ach-card.silver,
+.medal.silver,
+.ach-toast.silver {
+  --tier: #cfd8e6;
+}
+.ach-card.gold,
+.medal.gold,
+.ach-toast.gold {
+  --tier: #ffd36b;
+}
+.ach-text {
+  min-width: 0;
+}
+.ach-text p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.35;
+}
+.ach-date {
+  font-size: 11px;
+  color: var(--tier);
+}
+.ach-prog {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+.ach-prog small {
+  font-size: 11px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.ach-pts {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--tier);
+}
+.medal {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.35));
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  filter: grayscale(1);
+}
+.medal.earned {
+  filter: none;
+  border-color: var(--tier);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--tier) 55%, #fff), color-mix(in srgb, var(--tier) 35%, #1a0b2e) 70%);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--tier) 55%, transparent);
+}
+.medal span {
+  line-height: 1;
+}
+.ach-toast-wrap {
+  position: fixed;
+  top: 18px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 60;
+}
+.ach-toast {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 20px 10px 12px;
+  border-radius: 18px;
+  background: rgba(20, 8, 45, 0.94);
+  border: 2px solid var(--tier);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px color-mix(in srgb, var(--tier) 40%, transparent);
+  animation: toast-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1), toast-out 0.4s ease-in 3.8s forwards;
+}
+.ach-toast > div:last-child {
+  display: flex;
+  flex-direction: column;
+}
+.ach-toast small {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tier);
+}
+.ach-toast b {
+  font-family: var(--display);
+  font-size: 20px;
+}
+.ach-toast span {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+@keyframes toast-in {
+  from {
+    transform: translateY(-120%) scale(0.9);
+    opacity: 0;
+  }
+}
+@keyframes toast-out {
+  to {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+}

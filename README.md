@@ -42,6 +42,21 @@ packages/server   WebSocket matchmaking + authoritative battles
 docs/             Design doc and roadmap
 ```
 
+## Achievements
+
+All achievements live in `packages/client/src/game/achievements.ts` as plain data. Each entry has a name,
+description, category, tier (bronze 10 / silver 25 / gold 50 points), an icon glyph, and one unlock rule:
+
+- `match: (m, save) => boolean` is checked against every finished match (a `MatchRecord`: mode, mages,
+  difficulty, result, time, damage, spells, ultimates, best combo, HP left / lowest HP...).
+- `progress: (save) => [current, target]` reads the save (story, unlocks, Endless best, per-mage stats,
+  lifetime `totals`) and shows a progress bar.
+
+Add `secret: true` to hide it until earned. To retire one, set `retired: true` rather than deleting it; never
+reuse or rename an id, since ids are what saves store. New achievements are checked retroactively against
+saved history and totals on the next launch. Per-mage achievements are generated from the roster, so new
+mages get them for free. `npm test` checks ids are unique and every entry has a rule.
+
 ## Adding a mage
 
 Add an entry to `packages/core/src/characters.ts`: five colors, each with an `active` and `ultimate`

@@ -130,6 +130,9 @@ export interface BattleResult {
   won: boolean;
   state: BattleState;
   durationMs: number;
+  /** Your lowest HP during the match. */
+  lowestHp: number;
+  startHp: number;
 }
 
 const FX_LIFETIME = 1500;
@@ -218,6 +221,9 @@ export class BattleController {
   flash: [{ color: string; at: number } | null, { color: string; at: number } | null] = [null, null];
   paused = false;
   ended = false;
+  /** Your lowest HP so far (for achievements). */
+  lowestHp: number;
+  readonly startHp: number;
   /** Damage sources that are status ticks (Poison, Burn, ...), which shouldn't thud every second. */
   private dotLabels = new Set<string>();
 
@@ -243,6 +249,12 @@ export class BattleController {
       elapsed: 0,
     });
     this.display = [mk(0), mk(1)];
+    this.startHp = this.lowestHp = this.state.players[0].hp;
+  }
+
+  /** Snapshot for an unfinished match (forfeit). */
+  snapshot(): BattleResult {
+    return { won: false, state: this.state, durationMs: this.state.time, lowestHp: this.lowestHp, startHp: this.startHp };
   }
 
   // ---- input --------------------------------------------------------------
@@ -271,6 +283,7 @@ export class BattleController {
     this.realNow += dt;
 
     if (!this.state.over) this.handleEvents(tick(this.state, dt));
+    this.lowestHp = Math.min(this.lowestHp, this.state.players[0].hp);
     this.runAi();
     for (const d of this.display) this.advanceDisplay(d, dt);
 
@@ -287,7 +300,8 @@ export class BattleController {
       if (settled && this.endAt === null) this.endAt = this.realNow + 1100;
       if (this.endAt !== null && this.realNow >= this.endAt) {
         this.ended = true;
-        this.onEnd({ won: this.state.winner === 0, state: this.state, durationMs: this.state.time });
+        this.lowestHp = Math.min(this.lowestHp, this.state.players[0].hp);
+        this.onEnd({ won: this.state.winner === 0, state: this.state, durationMs: this.state.time, lowestHp: this.lowestHp, startHp: this.startHp });
       }
     }
   }

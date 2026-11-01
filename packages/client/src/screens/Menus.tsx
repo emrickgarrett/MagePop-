@@ -1,4 +1,5 @@
 import { AI_LEVELS, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryFight } from '@magepop/core';
+import { achievementScore } from '../game/achievements';
 import { HowToPlay } from '../components/HowToPlay';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { ReactNode, useEffect, useState } from 'react';
@@ -27,7 +28,7 @@ export function Logo() {
   );
 }
 
-export type MenuTarget = 'story' | 'quick' | 'endless' | 'pvp' | 'collection' | 'settings' | 'history';
+export type MenuTarget = 'story' | 'quick' | 'endless' | 'pvp' | 'collection' | 'settings' | 'history' | 'achievements';
 
 export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTarget) => void; onQuit?: () => void }) {
   const [confirmQuit, setConfirmQuit] = useState(false);
@@ -64,6 +65,12 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
         </button>
         <button className="btn mid ghost" onClick={() => go('history')}>
           History
+        </button>
+        <button className="btn mid ghost" onClick={() => go('achievements')}>
+          Achievements{' '}
+          <span className="count">
+            {achievementScore(save).unlocked}/{achievementScore(save).total}
+          </span>
         </button>
         <button className="btn mid ghost" onClick={() => setHowTo(true)}>
           How to Play
@@ -316,7 +323,7 @@ export function SettingsScreen({
             <div>
               <div className="setting-label">Reset progress</div>
               <div className="setting-desc">
-                Erases story progress, unlocked mages, mage stats and Endless records. Settings are kept.
+                Erases story progress, unlocked mages, mage stats, match history, achievements and Endless records. Settings are kept.
                 {resetDone && <b className="reset-done"> Progress reset.</b>}
               </div>
             </div>

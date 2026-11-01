@@ -43,8 +43,9 @@ export interface MatchRecord {
   detail: string;
   player: string;
   opponent: string;
-  /** Bot difficulty name (absent online). */
+  /** Bot difficulty name and id (absent online). */
   level?: string;
+  levelId?: string;
   result: 'win' | 'loss' | 'forfeit';
   durationMs: number;
   damageDealt: number;
@@ -53,6 +54,12 @@ export interface MatchRecord {
   ultimates: number;
   biggestCombo: number;
   healed: number;
+  // Added in 0.3 (older records don't have these).
+  gemMatches?: number;
+  startHp?: number;
+  hpLeft?: number;
+  lowestHp?: number;
+  maxHp?: number;
 }
 
 export const HISTORY_LIMIT = 200;
@@ -68,6 +75,10 @@ export interface SaveData {
   /** Has seen the How to Play guide (shown before the first battle). */
   seenHowToPlay: boolean;
   history: MatchRecord[];
+  /** Unlocked achievement id -> epoch ms. */
+  achievements: Record<string, number>;
+  /** Lifetime counters (never capped like history). See addTotals. */
+  totals: Record<string, number>;
   /** Per-mage records, keyed by character id. */
   mageStats: Record<string, MageStats>;
   settings: Settings;
@@ -96,6 +107,8 @@ const fresh = (): SaveData => ({
   mageStats: {},
   seenHowToPlay: false,
   history: [],
+  achievements: {},
+  totals: {},
   settings: { ...DEFAULT_SETTINGS },
 });
 
@@ -110,6 +123,9 @@ export function loadSave(): SaveData {
       storyBest: data.storyBest ?? {},
       mageStats: data.mageStats ?? {},
       history: data.history ?? [],
+      achievements: data.achievements ?? {},
+      // Saves from before lifetime totals existed: rebuild them from match history.
+      totals: data.totals ?? (data.history ?? []).reduceRight((t, m) => totalsWith(t, m), {} as Record<string, number>),
       // Players from before the guide existed who've already won fights don't need it forced on them.
       seenHowToPlay: data.seenHowToPlay ?? (data.storyCleared?.length ?? 0) > 0,
       settings: { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) },
@@ -183,8 +199,24 @@ export function recordMatch(
   return next;
 }
 
+function totalsWith(t: Record<string, number>, m: MatchRecord): Record<string, number> {
+  const add = (k: string, n = 1) => (t2[k] = (t2[k] ?? 0) + n);
+  const t2 = { ...t };
+  add('matches');
+  if (m.result === 'win') add('wins');
+  if (m.result === 'forfeit') add('forfeits');
+  add('damage', m.damageDealt);
+  add('spells', m.spells);
+  add('ultimates', m.ultimates);
+  add('healed', m.healed);
+  add('gemMatches', m.gemMatches ?? 0);
+  add(`mode:${m.mode}`);
+  return t2;
+}
+
+/** Log a finished match: history (capped) and lifetime totals. */
 export function addHistory(save: SaveData, rec: MatchRecord): SaveData {
-  const next = { ...save, history: [rec, ...save.history].slice(0, HISTORY_LIMIT) };
+  const next = { ...save, history: [rec, ...save.history].slice(0, HISTORY_LIMIT), totals: totalsWith(save.totals, rec) };
   writeSave(next);
   return next;
 }

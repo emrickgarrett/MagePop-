@@ -1,4 +1,4 @@
-import { BattleState, getCharacter, GemColor, PlayerIndex, Pos, validMoves } from '@magepop/core';
+import { getCharacter, GemColor, PlayerIndex, Pos, validMoves } from '@magepop/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BoardView } from '../components/BoardView';
 import { PlayerPanel, SpellLegend } from '../components/Hud';
@@ -57,7 +57,7 @@ export function BattleScreen({
   onGuideSeen?: () => void;
   onEnd: (r: BattleResult) => void;
   /** Forfeit from the pause menu (counts as a loss). */
-  onQuit: (state: BattleState) => void;
+  onQuit: (r: BattleResult) => void;
 }) {
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
@@ -217,7 +217,7 @@ export function BattleScreen({
             <button className="btn ghost" onClick={() => setGuide('pause')}>
               How to play
             </button>
-            <button className="btn ghost" onClick={() => onQuit(ctrl.state)}>
+            <button className="btn ghost" onClick={() => onQuit(ctrl.snapshot())}>
               Forfeit &amp; quit
             </button>
           </div>
