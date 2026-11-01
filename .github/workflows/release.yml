@@ -1,16 +1,17 @@
 # Builds the desktop game for Windows, macOS and Linux and attaches the installers to a
-# DRAFT GitHub release. Trigger it by pushing a version tag:
+# DRAFT GitHub release. Trigger it by pushing a version tag (patch, minor or major):
 #
-#   1. bump "version" in apps/desktop/package.json (e.g. 0.2.0)
-#   2. git tag v0.2.0 && git push origin v0.2.0
-#   3. review the draft on the Releases page, add notes, click Publish
+#   1. git tag v0.2.1 && git push origin v0.2.1
+#   2. review the draft on the Releases page, add notes, click Publish
+#
+# The tag IS the version: the build stamps it into the app, so package.json doesn't need bumping.
+# (Publishing the draft is what makes the in-game updater offer it to players.)
 #
 name: Release
 
 on:
   push:
     tags: ['v*']
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -29,10 +30,21 @@ jobs:
         with:
           node-version: 26
 
+      - name: Use the tag as the app version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' isn't a version like v1.2.3"
+            exit 1
+          fi
+          npm pkg set version="$VERSION" --workspace @magepop/desktop
+          echo "Building MagePop $VERSION"
+
       - name: Install dependencies
         run: npm install
 
-      - name: Test engine
+      - name: Run tests
         run: npm test
 
       - name: Build and publish installers

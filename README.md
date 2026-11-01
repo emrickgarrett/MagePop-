@@ -104,9 +104,12 @@ and `MagePop-<version>-portable.exe` (single file, no install). macOS builds a `
 
 **Publish a GitHub release** (builds Windows, macOS and Linux in GitHub Actions):
 
-1. Bump `version` in `apps/desktop/package.json`
-2. `git tag v<version> && git push origin v<version>`
-3. Open the draft on the repo's Releases page, add notes, publish
+1. `git tag v<version> && git push origin v<version>` (any version: `v0.3.0`, `v0.3.1`, `v1.0.0`)
+2. Open the draft on the repo's Releases page, add notes, publish
+
+The tag is the version: the workflow stamps it into the app, so there's nothing to bump first (the
+`version` in `apps/desktop/package.json` only matters for local builds). Installed copies update
+themselves once a release is **published**; drafts are invisible to them.
 
 Builds are unsigned for now, so Windows SmartScreen shows "unknown publisher" (More info → Run anyway)
 and macOS needs right-click → Open the first time.
