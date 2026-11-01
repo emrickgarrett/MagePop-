@@ -1,0 +1,89 @@
+{
+  "name": "@magepop/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MagePop!: a match-3 spell-duel game",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev:electron": "concurrently -k \"npm run dev -w @magepop/client\" \"wait-on http://localhost:5173 && cross-env MAGEPOP_DEV_URL=http://localhost:5173 electron .\"",
+    "dist": "npm run build -w @magepop/client && electron-builder",
+    "release": "npm run build -w @magepop/client && electron-builder --publish always"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.magepop.game",
+    "productName": "MagePop",
+    "electronVersion": "33.4.11",
+    "npmRebuild": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      {
+        "from": "../../packages/client/dist",
+        "to": "client"
+      }
+    ],
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.games"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game",
+      "executableName": "magepop"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "emrickgarrett",
+      "repo": "MagePop-",
+      "releaseType": "draft"
+    }
+  },
+  "author": "Taiwan (emrickgarrett)",
+  "homepage": "https://github.com/emrickgarrett/MagePop-"
+}

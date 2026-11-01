@@ -1,0 +1,43 @@
+# Builds the desktop game for Windows, macOS and Linux and attaches the installers to a
+# DRAFT GitHub release. Trigger it by pushing a version tag:
+#
+#   1. bump "version" in apps/desktop/package.json (e.g. 0.2.0)
+#   2. git tag v0.2.0 && git push origin v0.2.0
+#   3. review the draft on the Releases page, add notes, click Publish
+#
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Test engine
+        run: npm test
+
+      - name: Build and publish installers
+        run: npm run release -w @magepop/desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No code-signing certificates yet: build unsigned.
+          CSC_IDENTITY_AUTO_DISCOVERY: false

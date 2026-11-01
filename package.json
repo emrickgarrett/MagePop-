@@ -1,0 +1,21 @@
+{
+  "name": "magepop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Match-3 PVP battler",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @magepop/client",
+    "build": "npm run build -w @magepop/client",
+    "desktop": "npm run build && npm run start -w @magepop/desktop",
+    "desktop:dev": "npm run dev:electron -w @magepop/desktop",
+    "test": "npm run test -w @magepop/core",
+    "typecheck": "tsc -p packages/core && tsc -p packages/client && tsc -p packages/server",
+    "server": "npm run start -w @magepop/server",
+    "sim": "npm run sim -w @magepop/core",
+    "dist": "npm run dist -w @magepop/desktop"
+  }
+}

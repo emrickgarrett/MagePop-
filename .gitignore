@@ -1,0 +1,16 @@
+node_modules/
+dist/
+out/
+release/
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+
+# Art we're not using right now (old drafts, previews, unused sound library files).
+# Kept locally, never pushed.
+art/wip/
+
+# GameDeveloperHarness working files (the art/ folder doubles as a harness workspace)
+art/chat-history.json
+art/workspace.json
