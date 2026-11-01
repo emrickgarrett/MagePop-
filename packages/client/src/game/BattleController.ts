@@ -559,7 +559,12 @@ export class BattleController {
             if (frames.length) this.enqueue(e.player, frames);
             if (first === 'freeze') this.pushVfx({ kind: 'freeze', side: e.player, color: '#bfeaff', by: (1 - e.player) as PlayerIndex });
             else if (first === 'shatter') this.pushVfx({ kind: 'shatter', side: e.player, color: '#dff6ff', power: 0.9, by: (1 - e.player) as PlayerIndex });
-            else if (first === 'petrify') this.pushVfx({ kind: 'petrify', side: e.player, color: '#b9a98f', by: (1 - e.player) as PlayerIndex });
+            else if (first === 'petrify') {
+              const by = (1 - e.player) as PlayerIndex;
+              // The Hollow's drain reuses the stone step; tint it void-gray instead of earth-brown.
+              const color = this.state.players[by].characterId === 'hollow' ? '#cdc8e6' : '#b9a98f';
+              this.pushVfx({ kind: 'petrify', side: e.player, color, by });
+            }
           });
           this.boardSounds(e.player, e.steps, travel ? delay : 0, true);
           break;

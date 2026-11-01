@@ -132,6 +132,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     progress: (s) => [allStoryFights.filter((id) => s.storyCleared.includes(id)).length, allStoryFights.length],
   },
   {
+    id: 'color-restored',
+    name: 'Color Restored',
+    description: 'Defeat the Hollow and close the Fracture.',
+    category: 'journey',
+    tier: 'gold',
+    icon: '◌',
+    progress: (s) => [s.storyCleared.includes('finale-boss') ? 1 : 0, 1],
+  },
+  {
     id: 'story-speedrun',
     name: 'Skipping Class',
     description: 'Clear a story fight in under 50 seconds.',
@@ -419,6 +428,16 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   },
 
   // ---- Secret ------------------------------------------------------------------
+  {
+    id: 'colorless',
+    name: 'No Color, No Problem',
+    description: 'Beat the Hollow at Master difficulty with no healing and no shields.',
+    category: 'secret',
+    tier: 'gold',
+    icon: '🌑',
+    secret: true,
+    progress: (s) => [s.storyCleared.includes('finale-colorless') ? 1 : 0, 1],
+  },
   {
     id: 'retreat',
     name: 'Strategic Retreat',

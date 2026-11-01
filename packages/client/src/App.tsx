@@ -16,6 +16,7 @@ import {
   resetProgress,
   SaveData,
   Settings,
+  storyHeroFor,
   writeSave,
 } from './game/save';
 import { BattleScreen } from './screens/BattleScreen';
@@ -66,7 +67,9 @@ type Screen =
   | { name: 'result'; info: ResultInfo }
   | { name: 'puzzle'; title: string; hero: string; lesson: string; onDone: (r: { hintsUsed: number }) => void };
 
-const battleTheme = (championId: string) => `battle-${championId}` as MusicTrack;
+/** Each mage's battle music; mages without a track yet (the Hollow) borrow the Endless theme. */
+const THEMED_MUSIC = new Set(['ember', 'rime', 'briar', 'nyx', 'volt']);
+const battleTheme = (championId: string): MusicTrack => (THEMED_MUSIC.has(championId) ? (`battle-${championId}` as MusicTrack) : 'endless');
 
 /** Which music each screen plays. */
 function musicFor(s: Screen): MusicTrack {
@@ -194,7 +197,11 @@ export function App() {
           won: true,
           title: node.kind === 'lesson' ? 'Lesson complete!' : node.kind === 'survival' ? 'Survived!' : 'Victory!',
           subtitle:
-            (bossDone ? `${getCharacter(chap.hero).name}'s chapter complete` : `${node.title} cleared`) +
+            (bossDone
+              ? chap.anyHero
+                ? 'Finale complete! The Fracture is closed.'
+                : `${getCharacter(chap.hero).name}'s chapter complete`
+              : `${node.title} cleared`) +
             (newBest && res.timeMs !== null ? ` · New best time ${formatTime(res.timeMs)}!` : ''),
           unlocked,
           stars: { earned: res.stars, goals: res.goals },
@@ -211,7 +218,9 @@ export function App() {
     else setScreen({ name: 'dialogue', lines: node.outro, then: showResult, music: 'victory' });
   };
 
-  const playStory = (chap: StoryChapter, node: StoryNode, rematch = false) => {
+  const playStory = (chapter: StoryChapter, node: StoryNode, rematch = false) => {
+    // "Pick any mage" chapters (the finale) play as the mage chosen on the story map.
+    const chap = chapter.anyHero ? { ...chapter, hero: storyHeroFor(saveRef.current) } : chapter;
     const hero = getCharacter(chap.hero);
     const skipDialogue = rematch || (saveRef.current.settings.skipReplayDialogue && saveRef.current.storyCleared.includes(node.id));
 
@@ -544,6 +553,11 @@ export function App() {
             onPlay={(c, n) => playStory(c, n)}
             onDifficulty={(d) => {
               const s2 = { ...saveRef.current, settings: { ...saveRef.current.settings, storyDifficulty: d } };
+              writeSave(s2);
+              setSave(s2);
+            }}
+            onHero={(id) => {
+              const s2 = { ...saveRef.current, settings: { ...saveRef.current.settings, storyHero: id } };
               writeSave(s2);
               setSave(s2);
             }}

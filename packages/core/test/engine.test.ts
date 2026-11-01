@@ -130,10 +130,11 @@ describe('content', () => {
   });
 
   it('story chapters unlock every character in order', () => {
-    expect(STORY.map((c) => c.hero)).toEqual(CHARACTERS.map((c) => c.id));
-    expect(STORY.map((c) => c.unlocks)).toEqual(['rime', 'briar', 'nyx', 'volt', null]);
-    // Every chapter teaches all five of its mage's spells, through lessons or fight highlights.
-    for (const ch of STORY) {
+    const mageChapters = STORY.filter((c) => !c.anyHero);
+    expect(mageChapters.map((c) => c.hero)).toEqual(CHARACTERS.map((c) => c.id));
+    expect(STORY.map((c) => c.unlocks)).toEqual(['rime', 'briar', 'nyx', 'volt', null, null]);
+    // Every mage chapter teaches all five of its mage's spells, through lessons or fight highlights.
+    for (const ch of mageChapters) {
       const taught = ch.nodes.flatMap((n) =>
         n.kind === 'lesson' ? LESSONS[n.lesson].flatMap((st) => ('color' in st.goal && st.goal.color ? [st.goal.color] : [])) : (n.spotlight ?? []),
       );

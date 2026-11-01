@@ -1,4 +1,4 @@
-import { CHARACTERS, CellKind, GEM_COLORS, GemColor } from '@magepop/core';
+import { CHARACTERS, CellKind, GEM_COLORS, GemColor, STORY_ONLY_CHARACTERS } from '@magepop/core';
 
 /**
  * Per-champion art: themed gem icons and a board background.
@@ -39,7 +39,7 @@ function probe(src: string) {
 
 /** Start loading every champion's art up front so battles never flash fallback gems. */
 export function preloadThemes() {
-  for (const c of CHARACTERS) {
+  for (const c of [...CHARACTERS, ...STORY_ONLY_CHARACTERS]) {
     for (const color of GEM_COLORS) probe(gemImagePath(c.id, color));
     probe(boardImagePath(c.id));
   }

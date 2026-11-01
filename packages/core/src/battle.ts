@@ -28,6 +28,7 @@ import {
   BoardStep,
   Effect,
   GEM_COLORS,
+  GemColor,
   MatchGroup,
   PlayerIndex,
   PlayerState,
@@ -443,6 +444,25 @@ function applyEffect(ctx: Ctx, caster: PlayerIndex, e: Effect, dmgMult: number, 
         false,
       );
       break;
+    case 'hollow':
+      // Like stone, but the gem is drained rather than replaced: it keeps the color it had.
+      externalStep(
+        ctx,
+        foe,
+        'petrify',
+        (b) => {
+          const room = Math.max(0, MAX_STONES - countStones(b));
+          const cells = pickRandomCells(b, Math.min(room, e.count), (g) => g.kind !== 'stone' && g.frozenUntil <= now);
+          for (const p of cells) {
+            const g = getCell(b, p.r, p.c)!;
+            g.hollowOf = g.kind as GemColor;
+            g.kind = 'stone';
+          }
+          return cells;
+        },
+        false,
+      );
+      break;
     case 'destroy': {
       let n = 0;
       externalStep(
@@ -502,7 +522,8 @@ function applyEffect(ctx: Ctx, caster: PlayerIndex, e: Effect, dmgMult: number, 
       for (const g of me.board.cells) {
         if (!g) continue;
         g.frozenUntil = 0;
-        if (g.kind === 'stone') g.kind = GEM_COLORS[randInt(me.board, GEM_COLORS.length)];
+        if (g.kind === 'stone') g.kind = g.hollowOf ?? GEM_COLORS[randInt(me.board, GEM_COLORS.length)];
+        delete g.hollowOf;
       }
       emit(ctx, { type: 'cleanse', target: caster });
       break;

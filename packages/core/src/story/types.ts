@@ -86,8 +86,16 @@ export interface LessonNode extends NodeBase {
 export type StoryNode = FightNode | LessonNode | GauntletNode;
 
 export interface StoryChapter {
-  /** The mage you play as. */
+  /** Unique key (defaults to the hero's id). */
+  id?: string;
+  /** The mage you play as (with `anyHero`, only the default pick). */
   hero: string;
+  /** The player picks any unlocked mage for this chapter. */
+  anyHero?: boolean;
+  /** Hero id of a chapter that must be finished first (for chapters not tied to an unlock). */
+  requires?: string;
+  /** Mage shown on the chapter's tab instead of the hero (e.g. the villain). */
+  cover?: string;
   title: string;
   nodes: StoryNode[];
   /** Mage recruited by finishing the chapter. */

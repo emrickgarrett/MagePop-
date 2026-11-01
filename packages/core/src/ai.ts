@@ -59,6 +59,7 @@ export function effectValue(state: BattleState, me: PlayerIndex, e: Effect): num
     case 'freeze':
       return e.count * 1.4;
     case 'petrify':
+    case 'hollow':
       return e.count * 2;
     case 'destroy':
       return e.count * (0.6 + e.damagePerGem);

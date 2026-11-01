@@ -26,6 +26,8 @@ export function describeEffect(e: Effect, ch?: CharacterDef): string {
       return `Freeze ${e.count} enemy gems for ${sec(e.durationMs)}`;
     case 'petrify':
       return `Turn ${e.count} enemy gems to stone`;
+    case 'hollow':
+      return `Hollow out ${e.count} enemy gems (gray and unmatchable until a match next to them breaks them)`;
     case 'destroy':
       return `Destroy ${e.count} enemy gems (${e.damagePerGem} damage each)`;
     case 'shatter':

@@ -171,11 +171,56 @@ export const CHARACTERS: CharacterDef[] = [
   },
 ];
 
+/**
+ * The story's villain. Built as a full mage (spells, gems, portrait) so she can join the roster
+ * later, but for now she only appears in story mode: she is not in CHARACTERS, so she can't be
+ * picked in menus or online.
+ */
+export const HOLLOW: CharacterDef = {
+  id: 'hollow',
+  name: 'The Hollow',
+  title: 'the Colorless',
+  role: 'Drain · Hollow gems · Attrition',
+  blurb: 'A student who failed the Academy trials and learned to drain the color out of magic itself. Empties your board and feeds on what is left.',
+  palette: { primary: '#a3a8bd', secondary: '#e4e1f0' },
+  sigil: '◌',
+  spells: {
+    amethyst: {
+      active: { name: 'Unmake', effects: [{ kind: 'hollow', count: 3 }], flavor: 'Drains the color out of their gems.' },
+      ultimate: { name: 'Void Bloom', effects: [{ kind: 'hollow', count: 6 }, { kind: 'damage', amount: 5 }] },
+    },
+    ruby: {
+      active: { name: 'Null Lance', effects: [{ kind: 'damage', amount: 10 }] },
+      ultimate: { name: 'Oblivion', effects: [{ kind: 'damage', amount: 20 }, { kind: 'hollow', count: 2 }] },
+    },
+    topaz: {
+      active: { name: 'Siphon', effects: [{ kind: 'drain', amount: 7 }] },
+      ultimate: { name: 'Eclipse', effects: [{ kind: 'drain', amount: 15 }] },
+    },
+    sapphire: {
+      active: { name: 'Gray Veil', effects: [{ kind: 'shield', amount: 8 }] },
+      ultimate: { name: 'Empty Mantle', effects: [{ kind: 'shield', amount: 14 }, { kind: 'cleanse' }] },
+    },
+    emerald: {
+      active: { name: 'Fade', effects: [{ kind: 'stun', durationMs: 1200 }] },
+      ultimate: { name: 'Stillness', effects: [{ kind: 'stun', durationMs: 2400 }, { kind: 'hollow', count: 2 }] },
+    },
+  },
+};
+
+/** Mages that only appear in story mode (opponents, never picked by the player yet). */
+export const STORY_ONLY_CHARACTERS: CharacterDef[] = [HOLLOW];
+
 /** Null-prototype lookup, so inherited keys like "constructor" or "__proto__" are never mages. */
 export const CHARACTER_BY_ID: Record<string, CharacterDef> = Object.assign(
   Object.create(null) as Record<string, CharacterDef>,
-  Object.fromEntries(CHARACTERS.map((c) => [c.id, c])),
+  Object.fromEntries([...CHARACTERS, ...STORY_ONLY_CHARACTERS].map((c) => [c.id, c])),
 );
+
+/** Mages a player may choose (menus, online). Story-only mages are excluded. */
+export function isPlayableCharacter(id: unknown): id is string {
+  return typeof id === 'string' && CHARACTERS.some((c) => c.id === id);
+}
 
 export function getCharacter(id: string): CharacterDef {
   const c = Object.prototype.hasOwnProperty.call(CHARACTER_BY_ID, id) ? CHARACTER_BY_ID[id] : undefined;

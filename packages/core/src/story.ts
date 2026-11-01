@@ -5,6 +5,7 @@ import { EMBER_CHAPTER } from './story/ember';
 import { NYX_CHAPTER } from './story/nyx';
 import { RIME_CHAPTER } from './story/rime';
 import { VOLT_CHAPTER } from './story/volt';
+import { FINALE_CHAPTER } from './story/finale';
 import { G } from './story/goals';
 import { DialogueLine, FightNode, StoryChapter, StoryNode } from './story/types';
 import { GemColor } from './types';
@@ -117,7 +118,7 @@ function legacyChapter(hero: string, ci: number, order: string[]): StoryChapter 
   return { hero, title: flavor.title, nodes, unlocks: next };
 }
 
-/** The five chapters of "The Fracture" (the finale comes in phase 3). */
+/** The five chapters of "The Fracture" (the finale is appended after them). */
 const CHAPTERS: Record<string, StoryChapter> = {
   ember: EMBER_CHAPTER,
   rime: RIME_CHAPTER,
@@ -129,8 +130,11 @@ const CHAPTERS: Record<string, StoryChapter> = {
 export function buildStory(): StoryChapter[] {
   const order = chapterOrder();
   // A mage added without a written chapter still gets the classic three fights.
-  return order.map((hero, ci) => CHAPTERS[hero] ?? legacyChapter(hero, ci, order));
+  return [...order.map((hero, ci) => CHAPTERS[hero] ?? legacyChapter(hero, ci, order)), FINALE_CHAPTER];
 }
+
+/** Stable key for a chapter. */
+export const chapterId = (chap: StoryChapter) => chap.id ?? chap.hero;
 
 export const STORY: StoryChapter[] = buildStory();
 
@@ -148,11 +152,21 @@ export function chapterComplete(chap: StoryChapter, cleared: readonly string[]):
  * cleared (an optional node opens once the node before it is cleared).
  */
 export function nodeAvailable(chap: StoryChapter, index: number, cleared: readonly string[], unlocked: readonly string[]): boolean {
-  if (!unlocked.includes(chap.hero)) return false;
+  if (!chapterOpen(chap, cleared, unlocked)) return false;
   const node = chap.nodes[index];
   const before = chap.nodes.slice(0, index);
   if (node.optional) return index === 0 || cleared.includes(chap.nodes[index - 1].id) || before.filter((n) => !n.optional).every((n) => cleared.includes(n.id));
   return before.filter((n) => !n.optional).every((n) => cleared.includes(n.id));
+}
+
+/** Can the chapter be started at all? */
+export function chapterOpen(chap: StoryChapter, cleared: readonly string[], unlocked: readonly string[]): boolean {
+  if (!chap.anyHero && !unlocked.includes(chap.hero)) return false;
+  if (chap.requires) {
+    const req = STORY.find((c) => c.hero === chap.requires && !c.anyHero);
+    if (!req || !chapterComplete(req, cleared)) return false;
+  }
+  return true;
 }
 
 export const isFightNode = (n: StoryNode): n is FightNode => n.kind === 'fight' || n.kind === 'survival' || n.kind === 'boss';

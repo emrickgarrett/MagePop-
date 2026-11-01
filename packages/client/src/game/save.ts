@@ -19,6 +19,8 @@ export interface Settings {
   playerName: string;
   /** Last mage picked for online matches. */
   pvpMage: string | null;
+  /** Mage picked for "any mage" story chapters (the finale). */
+  storyHero: string | null;
   /** 0..1 */
   musicVolume: number;
   /** 0..1 */
@@ -128,6 +130,7 @@ export const DEFAULT_SETTINGS: Settings = {
   storyDifficulty: 'normal',
   playerName: '',
   pvpMage: null,
+  storyHero: null,
   musicVolume: 0.6,
   sfxVolume: 0.8,
 };
@@ -301,4 +304,11 @@ export function nextStoryNode(save: SaveData): { chap: StoryChapter; node: Story
 export function formatTime(ms: number): string {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** The mage to play "any mage" chapters with: the saved pick if unlocked, else the newest recruit. */
+export function storyHeroFor(save: SaveData): string {
+  const pick = save.settings.storyHero;
+  if (pick && save.unlocked.includes(pick)) return pick;
+  return save.unlocked[save.unlocked.length - 1] ?? 'ember';
 }

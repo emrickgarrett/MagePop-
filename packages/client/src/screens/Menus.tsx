@@ -1,4 +1,4 @@
-import { AI_LEVELS, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryNode } from '@magepop/core';
+import { AI_LEVELS, chapterId, chapterOpen, CHARACTERS, DialogueLine, getCharacter, STORY, StoryChapter, StoryNode } from '@magepop/core';
 import { achievementScore } from '../game/achievements';
 import { HowToPlay } from '../components/HowToPlay';
 import { UpdateBanner } from '../components/UpdateBanner';
@@ -7,7 +7,18 @@ import { Gem } from '../components/Gem';
 import { Portrait, SpellTable } from '../components/Hud';
 import { audio } from '../game/audio';
 import { isDesktop, isFullscreen, setFullscreen } from '../game/platform';
-import { formatTime, mageStatsOf, nextStoryNode, STORY_DIFFICULTY, nodeOpen, storyNodesCleared, storyStarsEarned, TOTAL_STORY_NODES, TOTAL_STORY_STARS } from '../game/save';
+import {
+  formatTime,
+  mageStatsOf,
+  nextStoryNode,
+  STORY_DIFFICULTY,
+  nodeOpen,
+  storyHeroFor,
+  storyNodesCleared,
+  storyStarsEarned,
+  TOTAL_STORY_NODES,
+  TOTAL_STORY_STARS,
+} from '../game/save';
 import type { RecordStats, SaveData, Settings, StoryDifficulty } from '../game/save';
 
 export function Logo() {
@@ -149,11 +160,14 @@ export function StoryMap({
   onBack,
   onPlay,
   onDifficulty,
+  onHero,
 }: {
   save: SaveData;
   onBack: () => void;
   onPlay: (ch: StoryChapter, node: StoryNode) => void;
   onDifficulty: (d: StoryDifficulty) => void;
+  /** Pick the mage for "any mage" chapters (the finale). */
+  onHero: (id: string) => void;
 }) {
   const difficulty = save.settings.storyDifficulty ?? 'normal';
   const next = nextStoryNode(save);
@@ -164,7 +178,8 @@ export function StoryMap({
   const [nodeId, setNodeId] = useState<string>(() => next?.node.id ?? chap.nodes[0].id);
   const nodeIdx = Math.max(0, chap.nodes.findIndex((n) => n.id === nodeId));
   const node = chap.nodes[nodeIdx];
-  const hero = getCharacter(chap.hero);
+  const heroOf = (c: StoryChapter) => getCharacter(c.anyHero ? storyHeroFor(save) : c.hero);
+  const hero = heroOf(chap);
   const open = nodeOpen(save, chap, nodeIdx);
   const pickChapter = (i: number) => {
     setChapIdx(i);
@@ -196,7 +211,7 @@ export function StoryMap({
         </div>
         {next ? (
           <button className="btn" onClick={() => onPlay(next.chap, next.node)}>
-            {cleared === 0 ? 'Begin' : 'Continue'}: {getCharacter(next.chap.hero).name} · {next.node.title}
+            {cleared === 0 ? 'Begin' : 'Continue'}: {heroOf(next.chap).name} · {next.node.title}
           </button>
         ) : (
           <div className="ss-done">Every chapter cleared! Go back for stars.</div>
@@ -206,21 +221,21 @@ export function StoryMap({
       <div className="story-layout">
         <div className="chapter-list">
           {STORY.map((c, ci) => {
-            const h = getCharacter(c.hero);
-            const unlocked = save.unlocked.includes(c.hero);
+            const h = getCharacter(c.cover ?? c.hero);
+            const unlocked = chapterOpen(c, save.storyCleared, save.unlocked);
             const req = c.nodes.filter((n) => !n.optional);
             const done = req.filter((n) => save.storyCleared.includes(n.id)).length;
             const st = c.nodes.reduce((t, n) => t + (save.storyStars[n.id] ?? 0), 0);
             return (
               <button
-                key={c.hero}
-                className={`chapter-tab ${ci === chapIdx ? 'on' : ''} ${unlocked ? '' : 'locked'}`}
+                key={chapterId(c)}
+                className={`chapter-tab ${ci === chapIdx ? 'on' : ''} ${unlocked ? '' : 'locked'} ${c.anyHero ? 'finale' : ''}`}
                 style={{ '--accent': h.palette.primary } as React.CSSProperties}
                 onClick={() => pickChapter(ci)}
               >
                 <Portrait ch={h} size={46} locked={!unlocked} />
                 <span className="ct-text">
-                  <small>Chapter {ci + 1}</small>
+                  <small>{c.anyHero ? 'Finale' : `Chapter ${ci + 1}`}</small>
                   <b>{unlocked ? c.title : '???'}</b>
                   <span className="muted">
                     {unlocked ? (
@@ -228,34 +243,42 @@ export function StoryMap({
                         {done}/{req.length} · ★ {st}/{c.nodes.length * 3}
                       </>
                     ) : (
-                      `Finish ${getCharacter(STORY[ci - 1]?.hero ?? 'ember').name}'s chapter`
+                      `Finish ${getCharacter(c.requires ?? STORY[ci - 1]?.hero ?? 'ember').name}'s chapter`
                     )}
                   </span>
                 </span>
               </button>
             );
           })}
-          <div className="chapter-tab locked finale">
-            <span className="finale-icon">?</span>
-            <span className="ct-text">
-              <small>Finale</small>
-              <b>The Hollow</b>
-              <span className="muted">Coming in a future update</span>
-            </span>
-          </div>
         </div>
 
         <div className="chapter-view" style={{ '--accent': hero.palette.primary } as React.CSSProperties}>
           <div className="cv-head">
-            <h3>
-              {hero.name}: {chap.title}
-            </h3>
+            <h3>{chap.anyHero ? `Finale: ${chap.title}` : `${hero.name}: ${chap.title}`}</h3>
             {chap.unlocks && (
               <span className="muted">
                 Reward: {save.unlocked.includes(chap.unlocks) ? getCharacter(chap.unlocks).name : 'a new mage'}
               </span>
             )}
           </div>
+          {chap.anyHero && (
+            <div className="hero-pick">
+              <span className="muted">Play as:</span>
+              {CHARACTERS.filter((c) => save.unlocked.includes(c.id)).map((c) => (
+                <button
+                  key={c.id}
+                  className={`hero-pick-btn ${c.id === hero.id ? 'on' : ''}`}
+                  style={{ '--accent': c.palette.primary } as React.CSSProperties}
+                  onClick={() => onHero(c.id)}
+                  title={`${c.name} ${c.title}`}
+                  aria-pressed={c.id === hero.id}
+                >
+                  <Portrait ch={c} size={38} />
+                  <span>{c.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="node-path">
             {chap.nodes.map((n, i) => {
               const isCleared = save.storyCleared.includes(n.id);

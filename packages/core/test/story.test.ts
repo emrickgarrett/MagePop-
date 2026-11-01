@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyMove,
+  CHARACTER_BY_ID,
   chapterComplete,
+  chapterOpen,
+  findValidMoves,
   createBattle,
   findGroups,
   isCharacterId,
+  parseClientMessage,
   LESSONS,
   nodeAvailable,
   solvePuzzle,
   startPuzzle,
   STORY,
+  tick,
 } from '../src';
 
 describe('story data', () => {
@@ -29,7 +35,7 @@ describe('story data', () => {
         const fights = n.kind === 'gauntlet' ? n.waves.map((w) => ({ ...w, playerHp: undefined })) : [n];
         if (n.kind === 'gauntlet') expect(n.waves.length).toBeGreaterThanOrEqual(2);
         for (const f of fights) {
-          expect(isCharacterId(f.opponent), n.id).toBe(true);
+          expect(CHARACTER_BY_ID[f.opponent], n.id).toBeDefined();
           expect(() =>
             createBattle({ seed: 1, characters: [c.hero, f.opponent], maxHp: [f.playerHp ?? 250, f.opponentHp ?? 250], rules: f.rules }),
           ).not.toThrow();
@@ -61,5 +67,50 @@ describe('story data', () => {
     const boss = ember.nodes.length - 1;
     expect(nodeAvailable(ember, boss, req.slice(0, -1), ['ember'])).toBe(true);
     expect(nodeAvailable(ember, opt, req.slice(0, opt), ['ember'])).toBe(true);
+  });
+});
+
+describe('finale and the Hollow', () => {
+  const finale = STORY.find((c) => c.anyHero)!;
+  const volt = STORY.find((c) => c.hero === 'volt' && !c.anyHero)!;
+  const voltDone = volt.nodes.filter((n) => !n.optional).map((n) => n.id);
+
+  it('opens only after Volt\'s chapter, for any mage', () => {
+    expect(finale.id).toBe('finale');
+    expect(chapterOpen(finale, [], ['ember'])).toBe(false);
+    expect(chapterOpen(finale, voltDone, ['ember'])).toBe(true);
+    expect(nodeAvailable(finale, 0, voltDone, ['rime'])).toBe(true);
+    expect(nodeAvailable(finale, 1, voltDone, ['rime'])).toBe(false);
+  });
+
+  it('the Hollow is story-only: not pickable online', () => {
+    expect(CHARACTER_BY_ID.hollow).toBeDefined();
+    expect(isCharacterId('hollow')).toBe(false);
+    expect(parseClientMessage(JSON.stringify({ t: 'queue', characterId: 'hollow' }))).toBeNull();
+  });
+
+  it('hollow gems keep their color, can\'t be matched, and break when matched next to', () => {
+    // The Hollow's Unmake on the player's board, via a pulse.
+    const s = createBattle({
+      seed: 3,
+      characters: ['ember', 'hollow'],
+      rules: { pulses: [{ everyMs: 1000, target: 'player', label: 'drain', effects: [{ kind: 'hollow', count: 6 }] }] },
+    });
+    tick(s, 1000);
+    const b = s.players[0].board;
+    const hollow = b.cells.filter((g) => g?.hollowOf);
+    expect(hollow.length).toBe(6);
+    for (const g of hollow) expect(g!.kind).toBe('stone');
+    // Play moves until one breaks a hollow gem.
+    let broke = false;
+    for (let i = 0; i < 40 && !broke; i++) {
+      s.players[0].busyUntil = 0;
+      const before = b.cells.filter((g) => g?.hollowOf).length;
+      const mv = findValidMoves(b, s.time)[0];
+      if (!mv) break;
+      applyMove(s, 0, mv.a, mv.b);
+      broke = b.cells.filter((g) => g?.hollowOf).length < before;
+    }
+    expect(broke).toBe(true);
   });
 });

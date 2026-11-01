@@ -244,7 +244,12 @@ export function shuffleBoard(b: Board, now: number): void {
   // Fallback: recolor movable gems, and clear stones if the board is choked.
   for (let attempt = 0; attempt < 200; attempt++) {
     for (const i of slots) b.cells[i]!.kind = GEM_COLORS[randInt(b, GEM_COLORS.length)];
-    if (attempt > 50) b.cells.forEach((g) => g && g.kind === 'stone' && (g.kind = GEM_COLORS[randInt(b, 5)]));
+    if (attempt > 50)
+      b.cells.forEach((g) => {
+        if (!g || g.kind !== 'stone') return;
+        g.kind = g.hollowOf ?? GEM_COLORS[randInt(b, 5)];
+        delete g.hollowOf;
+      });
     if (findGroups(b).length === 0 && findValidMoves(b, now).length > 0) return;
   }
 }

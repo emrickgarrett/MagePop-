@@ -102,7 +102,16 @@ export function BoardView({ frame, engineTime, cell, interactive, onMove, stunne
         return (
           <div key={g.id} className="gem-slot" style={slotStyle}>
             <div className={`gem-inner ${drop ? 'dropping' : ''} ${fx ? `fx-${fx}` : ''} ${isSel ? 'selected' : ''} ${isHint && !isSel ? 'hinted' : ''}`} style={innerStyle}>
-              <Gem kind={g.kind} size={cell * 0.86} theme={theme} />
+              {g.hollowOf ? (
+                <>
+                  <span className="hollowed">
+                    <Gem kind={g.hollowOf} size={cell * 0.86} theme={theme} />
+                  </span>
+                  <div className="hollow-ring" />
+                </>
+              ) : (
+                <Gem kind={g.kind} size={cell * 0.86} theme={theme} />
+              )}
               {frozen && <div className="ice" />}
             </div>
           </div>

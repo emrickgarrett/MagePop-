@@ -16,6 +16,8 @@ export interface Gem {
   kind: CellKind;
   /** Battle time (ms) when the ice melts. 0 = not frozen. */
   frozenUntil: number;
+  /** A hollowed gem: drained to a gray shell (kind = 'stone') that remembers its color. */
+  hollowOf?: GemColor;
 }
 
 export type Cell = Gem | null;
@@ -56,6 +58,7 @@ export type Effect =
   | { kind: 'regen'; perSecond: number; durationMs: number }
   | { kind: 'freeze'; count: number; durationMs: number }
   | { kind: 'petrify'; count: number }
+  | { kind: 'hollow'; count: number }
   | { kind: 'destroy'; count: number; damagePerGem: number }
   | { kind: 'shatter'; damagePerGem: number; minDamage: number }
   | { kind: 'stun'; durationMs: number }

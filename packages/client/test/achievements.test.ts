@@ -99,6 +99,8 @@ const EXAMPLES: Record<string, Example> = {
   'first-chapter': { save: (s) => ({ ...s, storyCleared: STORY[0].nodes.filter((n) => !n.optional).map((n) => n.id) }) },
   'full-roster': { save: (s) => ({ ...s, unlocked: CHARACTERS.map((c) => c.id) }) },
   valedictorian: { save: (s) => ({ ...s, storyCleared: allFights }) },
+  'color-restored': { save: (s) => ({ ...s, storyCleared: ['finale-boss'] }) },
+  colorless: { save: (s) => ({ ...s, storyCleared: ['finale-colorless'] }) },
   'story-speedrun': { match: { mode: 'story', durationMs: 49_000 } },
   ultimate: { match: { result: 'loss', ultimates: 1 } },
   showoff: { match: { ultimates: 5 } },

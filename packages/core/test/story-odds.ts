@@ -28,7 +28,12 @@ function fight(seed: number, hero: string, foe: string, foeLevel: number, rules:
   return s;
 }
 console.log(`Player bot: ${PLAYER.name}, ${N} runs per node`);
-for (const c of STORY) {
+const ONLY = process.env.ONLY; // e.g. ONLY=finale or ONLY=volt
+for (const chap of STORY) {
+  if (ONLY && (chap.id ?? chap.hero) !== ONLY) continue;
+  // "Pick any mage" chapters run once per mage.
+  for (const hero of chap.anyHero ? ['ember', 'rime', 'briar', 'nyx', 'volt'] : [chap.hero]) {
+  const c = { ...chap, hero };
   for (const n of c.nodes) {
     if (n.kind === 'lesson') continue;
     let wins = 0, time = 0;
@@ -49,4 +54,5 @@ for (const c of STORY) {
     }
     console.log(`${c.hero.padEnd(6)} ${n.kind.padEnd(8)} ${n.id.padEnd(22)} win ${String(Math.round(wins / N * 100)).padStart(3)}%  avg win ${(wins ? time / wins / 1000 : 0).toFixed(0)}s${n.optional ? '  (challenge)' : ''}`);
   }
+}
 }

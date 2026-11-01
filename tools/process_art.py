@@ -50,6 +50,11 @@ SOURCES = {
         "order": ["topaz", "sapphire", "ruby", "amethyst", "emerald"],
         "board": "Dark_storm-cloud_night_sky_texture_seen_from_above_00137059-8c9a-47f6-a678-7287da6f1b1d.jpg",
     },
+    "hollow": {
+        "sheet": "ONE_sprite_sheet_with_five_match-3_puzzle_gem_icon_004877e4-7887-4277-900d-c0603e71d818.jpg",
+        "order": ["ruby", "topaz", "amethyst", "sapphire", "emerald"],
+        "board": "Dark_fractured_void_background_for_match-3_puzzle_3dbe3a04-11dc-41f1-9b0a-a36a1895cf26.jpg",
+    },
 }
 
 GEM_SIZE = 256
@@ -92,6 +97,9 @@ def components(mask: np.ndarray):
 
 def cut_gems(sheet_path: Path, order: list[str]) -> dict[str, Image.Image]:
     img = Image.open(sheet_path).convert("RGB")
+    # Some generations come back with a thin gray edge line; paint a white frame over it so the
+    # background flood fill still reaches every icon's surroundings.
+    ImageDraw.Draw(img).rectangle((0, 0, img.width - 1, img.height - 1), outline=(255, 255, 255), width=4)
     bg = background_mask(img)
     fg = ~bg
     # Label at quarter resolution for speed, then map boxes back up.
@@ -101,6 +109,8 @@ def cut_gems(sheet_path: Path, order: list[str]) -> dict[str, Image.Image]:
     for area, ys, xs in components(small):
         if area < 12:  # stray specks
             continue
+        if (xs.max() - xs.min()) * s > img.width / 2 or (ys.max() - ys.min()) * s > img.height * 0.75:
+            continue  # faint grid lines the generator sometimes draws between cells
         cy, cx = ys.mean() * s, xs.mean() * s
         col = min(2, int(cx / (img.width / 3)))
         row = min(1, int(cy / (img.height / 2)))

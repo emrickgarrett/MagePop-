@@ -7,7 +7,7 @@
  * checks), and everything the server sends goes through the public* helpers, which strip the
  * board RNG state so nobody can predict upcoming gems.
  */
-import { CHARACTER_BY_ID } from './characters';
+import { CHARACTER_BY_ID, isPlayableCharacter } from './characters';
 import { BattleEvent, BattleState, Board, BoardStep, PlayerIndex, PlayerState, Pos } from './types';
 
 export const PROTOCOL_VERSION = 2;
@@ -126,7 +126,8 @@ const isPos = (x: unknown): x is Pos => isObj(x) && isInt(x.r, 0, 63) && isInt(x
 
 /** True only for real mage ids (never inherited keys like "constructor" or "__proto__"). */
 export function isCharacterId(id: unknown): id is string {
-  return typeof id === 'string' && id.length <= 32 && Object.prototype.hasOwnProperty.call(CHARACTER_BY_ID, id);
+  // Only the playable roster: story-only mages (the Hollow) can't be picked online.
+  return typeof id === 'string' && id.length <= 32 && Object.prototype.hasOwnProperty.call(CHARACTER_BY_ID, id) && isPlayableCharacter(id);
 }
 
 /**

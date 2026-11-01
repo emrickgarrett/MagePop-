@@ -48,6 +48,7 @@ export const MAGE_FX: Record<string, MageFx> = {
   briar: { main: '#4cd97b', light: '#d8ffb8', particle: 'leaf', stun: 'vines' },
   nyx: { main: '#b26bff', light: '#ff9be6', particle: 'wisp', stun: 'hex' },
   volt: { main: '#ffe45c', light: '#c9f4ff', particle: 'spark', stun: 'lightning' },
+  hollow: { main: '#b8b4d0', light: '#f1eefc', particle: 'wisp', stun: 'hex' },
 };
 
 function mageFx(theme: string | undefined, fallback: string): MageFx {
@@ -257,7 +258,9 @@ function BoardAura({ v: raw, t, r }: { v: Vfx; t: number; r: Rect }) {
   let tint: CSSProperties = {};
 
   /** Particles drifting up (dy<0) or down (dy>0) across the board. */
+  let driftCalls = 0;
   const drift = (count: number, opts: { dy: number; size: [number, number]; cls: string; glyph?: string; spin?: boolean; color?: string }) => {
+    const call = driftCalls++; // keys stay unique when one effect drifts several particle kinds
     for (let i = 0; i < count; i++) {
       const x = rnd() * r.w;
       const start = rnd() * 0.45; // staggered starts
@@ -270,7 +273,7 @@ function BoardAura({ v: raw, t, r }: { v: Vfx; t: number; r: Rect }) {
       const wob = Math.sin((u * 5 + i) * 2) * 8;
       parts.push(
         <div
-          key={`d${i}`}
+          key={`d${call}-${i}`}
           className={opts.cls}
           style={{
             left: x + wob,
