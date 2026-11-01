@@ -329,6 +329,32 @@ function UltimateBanner({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
   const ch = v.theme ? getCharacter(v.theme) : null;
   // Slide in fast, hold, slide out.
   const x = t < 0.18 ? -1 + easeOut(t / 0.18) : t > 0.8 ? easeOut((t - 0.8) / 0.2) : 0;
+  if (v.side === 0) {
+    // Your own ultimate: a compact strip just under your board, so it never covers the gems you're playing.
+    const w = Math.min(r.w * 0.78, 420);
+    const h = 54;
+    const pop = t < 0.15 ? easeOut(t / 0.15) : t > 0.82 ? 1 - easeOut((t - 0.82) / 0.18) : 1;
+    return (
+      <div
+        className="fx-ult-strip"
+        style={{
+          left: r.x + (r.w - w) / 2,
+          top: r.y + r.h + 4,
+          width: w,
+          height: h,
+          opacity: pop,
+          transform: `translateY(${(1 - pop) * -14}px) scale(${0.9 + 0.1 * pop})`,
+          '--c': v.color,
+        } as CSSProperties}
+      >
+        {ch && <img src={`assets/portraits/${ch.id}.png`} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+        <div className="fx-ult-text">
+          <small>ULTIMATE</small>
+          <span>{v.label}</span>
+        </div>
+      </div>
+    );
+  }
   const flash = clamp01(1 - t / 0.25);
   return (
     <div className="fx-aura" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}>

@@ -44,6 +44,8 @@ type Screen =
       /** For stats and match history. */
       mode: MatchMode;
       detail: string;
+      /** Endless wave number. */
+      wave?: number;
       spotlight?: StoryFight['spotlight'];
       onEnd: (r: BattleResult) => void;
       music: MusicTrack;
@@ -110,6 +112,9 @@ function historyEntry(screen: Extract<Screen, { name: 'battle' }>, r: BattleResu
     hpLeft: me.hp,
     lowestHp: r.lowestHp,
     maxHp: me.maxHp,
+    wave: screen.wave,
+    overkill: me.stats.overkill,
+    frozenAndStunned: r.frozenAndStunned,
   };
 }
 
@@ -307,6 +312,7 @@ export function App() {
       header: `Endless · Wave ${wave} · vs ${getCharacter(opponent).name} (${lvl.name})`,
       mode: 'endless',
       detail: `Wave ${wave}`,
+      wave,
       music: 'endless',
       onEnd: (r) => {
         if (r.won) {

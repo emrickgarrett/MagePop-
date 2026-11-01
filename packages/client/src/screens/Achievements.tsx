@@ -22,7 +22,7 @@ export function AchievementsScreen({ save, onBack }: { save: SaveData; onBack: (
     // Earned first (newest first), then closest to done.
     .map((a) => {
       const at = save.achievements[a.id];
-      const prog = a.progress && !at ? a.progress(save) : null;
+      const prog = a.progress && !at && !a.secret ? a.progress(save) : null;
       return {
         a,
         at,

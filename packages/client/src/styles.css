@@ -2455,3 +2455,31 @@ small {
     opacity: 0;
   }
 }
+.fx-ult-strip {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px 0 6px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 80%, #120624), color-mix(in srgb, var(--c) 45%, #120624));
+  border: 2px solid #fff8;
+  box-shadow: 0 0 26px var(--c), 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+.fx-ult-strip img {
+  height: 46px;
+  width: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+}
+.fx-ult-strip .fx-ult-text {
+  transform: none;
+}
+.fx-ult-strip .fx-ult-text small {
+  font-size: 10px;
+}
+.fx-ult-strip .fx-ult-text span {
+  font-size: 22px;
+}

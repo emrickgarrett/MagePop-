@@ -113,6 +113,8 @@ export interface PlayerStats {
   damageDealt: number;
   healed: number;
   biggestCombo: number;
+  /** Damage past zero on the blow that won the match (0 if you didn't win by damage). */
+  overkill: number;
 }
 
 export interface PlayerState {

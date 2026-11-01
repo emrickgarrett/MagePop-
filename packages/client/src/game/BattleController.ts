@@ -133,6 +133,8 @@ export interface BattleResult {
   /** Your lowest HP during the match. */
   lowestHp: number;
   startHp: number;
+  /** You had frozen gems while stunned at some point. */
+  frozenAndStunned: boolean;
 }
 
 const FX_LIFETIME = 1500;
@@ -224,6 +226,7 @@ export class BattleController {
   /** Your lowest HP so far (for achievements). */
   lowestHp: number;
   readonly startHp: number;
+  frozenAndStunned = false;
   /** Damage sources that are status ticks (Poison, Burn, ...), which shouldn't thud every second. */
   private dotLabels = new Set<string>();
 
@@ -254,7 +257,14 @@ export class BattleController {
 
   /** Snapshot for an unfinished match (forfeit). */
   snapshot(): BattleResult {
-    return { won: false, state: this.state, durationMs: this.state.time, lowestHp: this.lowestHp, startHp: this.startHp };
+    return {
+      won: false,
+      state: this.state,
+      durationMs: this.state.time,
+      lowestHp: this.lowestHp,
+      startHp: this.startHp,
+      frozenAndStunned: this.frozenAndStunned,
+    };
   }
 
   // ---- input --------------------------------------------------------------
@@ -283,7 +293,7 @@ export class BattleController {
     this.realNow += dt;
 
     if (!this.state.over) this.handleEvents(tick(this.state, dt));
-    this.lowestHp = Math.min(this.lowestHp, this.state.players[0].hp);
+    this.trackMe();
     this.runAi();
     for (const d of this.display) this.advanceDisplay(d, dt);
 
@@ -300,9 +310,18 @@ export class BattleController {
       if (settled && this.endAt === null) this.endAt = this.realNow + 1100;
       if (this.endAt !== null && this.realNow >= this.endAt) {
         this.ended = true;
-        this.lowestHp = Math.min(this.lowestHp, this.state.players[0].hp);
-        this.onEnd({ won: this.state.winner === 0, state: this.state, durationMs: this.state.time, lowestHp: this.lowestHp, startHp: this.startHp });
+        this.trackMe();
+        this.onEnd({ ...this.snapshot(), won: this.state.winner === 0 });
       }
+    }
+  }
+
+  /** Running facts about your side for achievements. */
+  private trackMe() {
+    const me = this.state.players[0];
+    this.lowestHp = Math.min(this.lowestHp, me.hp);
+    if (!this.frozenAndStunned && me.stunnedUntil > this.state.time) {
+      this.frozenAndStunned = me.board.cells.some((g) => !!g && g.frozenUntil > this.state.time);
     }
   }
 

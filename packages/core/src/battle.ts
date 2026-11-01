@@ -95,7 +95,7 @@ function createPlayer(index: PlayerIndex, cfg: BattleConfig): PlayerState {
     stunnedUntil: 0,
     busyUntil: 0,
     empower: null,
-    stats: { moves: 0, matches: 0, spells: 0, ultimates: 0, damageDealt: 0, healed: 0, biggestCombo: 0 },
+    stats: { moves: 0, matches: 0, spells: 0, ultimates: 0, damageDealt: 0, healed: 0, biggestCombo: 0, overkill: 0 },
   };
 }
 
@@ -135,6 +135,7 @@ function dealDamage(ctx: Ctx, attacker: PlayerIndex, raw: number, source: string
   state.players[attacker].stats.damageDealt += hpLoss + absorbed;
   emit(ctx, { type: 'damage', target: target.index, amount: hpLoss, absorbed, source });
   if (target.hp <= 0) {
+    state.players[attacker].stats.overkill = amount - absorbed - hpLoss;
     state.over = true;
     state.winner = attacker;
     emit(ctx, { type: 'gameOver', winner: attacker });

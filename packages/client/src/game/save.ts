@@ -60,6 +60,13 @@ export interface MatchRecord {
   hpLeft?: number;
   lowestHp?: number;
   maxHp?: number;
+  // Added in 0.3.
+  /** Endless wave number. */
+  wave?: number;
+  /** Damage past zero on your winning blow. */
+  overkill?: number;
+  /** You had frozen gems while stunned at some point. */
+  frozenAndStunned?: boolean;
 }
 
 export const HISTORY_LIMIT = 200;
