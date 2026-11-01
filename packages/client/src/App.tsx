@@ -1,4 +1,4 @@
-import { aiLevel, BattleRules, CHARACTERS, DialogueLine, FightSummary, GemColor, getCharacter, LESSONS, RULES, ServerMessage, StoryChapter, StoryNode } from '@magepop/core';
+import { aiLevel, BattleRules, easedLevel, CHARACTERS, DialogueLine, FightSummary, GemColor, getCharacter, LESSONS, RULES, ServerMessage, StoryChapter, StoryNode } from '@magepop/core';
 import { useEffect, useRef, useState } from 'react';
 import { audio, MusicTrack } from './game/audio';
 import { BattleController, BattleResult, BattleSetup } from './game/BattleController';
@@ -190,7 +190,13 @@ export function App() {
   /** After a story node: save stars, show the result, offer the next node. */
   const finishNode = (chap: StoryChapter, node: StoryNode, res: { stars: number; timeMs: number | null; goals: { text: string; ok: boolean }[] }, r?: BattleResult) => {
     const starsBefore = storyStarsEarned(saveRef.current);
-    const { save: s2, unlocked, newBest } = clearStoryNode(saveRef.current, node.id, res.timeMs, res.goals.map((g) => g.ok));
+    const { save: s2, unlocked, newBest } = clearStoryNode(
+      saveRef.current,
+      node.id,
+      res.timeMs,
+      res.goals.map((g) => g.ok),
+      saveRef.current.settings.storyDifficulty ?? 'normal',
+    );
     const newRewards = rewardsBetween(starsBefore, storyStarsEarned(s2));
     setSave(s2);
     const idx = chap.nodes.indexOf(node);
@@ -302,7 +308,7 @@ export function App() {
             seed: newSeed(),
             player: chap.hero,
             opponent: w.opponent,
-            aiLevel: aiLevel(w.aiLevel + diff.level),
+            aiLevel: easedLevel(aiLevel(w.aiLevel + diff.level), diff.pace, diff.slip),
             maxHp,
             hp: hp !== undefined ? [hp, maxHp[1]] : undefined,
             rules,

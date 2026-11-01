@@ -2,16 +2,20 @@
  * How winnable is each story fight? Simulates a player bot against every fight node.
  *   npx tsx test/story-odds.ts <playerLevel 0-5> <runs> [levelDelta] [enemyHpScale]
  * e.g. Normal for a solid player: `3 40`; Relaxed for a newer one: `2 30 -1 0.85`.
- * Targets (Expert player, Normal): fights ~70-100%, bosses ~35-90% rising in difficulty.
+ * Env: ONLY=<chapter id> one chapter; PACE/SLIP ease the bots like a story difficulty does;
+ * PPACE slows the player bot. Human stand-in used for tuning Normal (Nov 2026):
+ *   PPACE=1.4 PACE=1.45 SLIP=0.08 npx tsx test/story-odds.ts 3 16
+ * Targets for that: fights ~70-100%, bosses ~45-70%.
  */
-import { AI_LEVELS, applyMove, chooseMove, createBattle, STORY, thinkDelay, tick, BattleRules } from '../src';
-const PLAYER = AI_LEVELS[Number(process.argv[2] ?? 3)];
+import { AI_LEVELS, applyMove, chooseMove, createBattle, easedLevel, STORY, thinkDelay, tick, BattleRules } from '../src';
+// PPACE slows the player bot to stand in for a human (who sees good moves but takes longer).
+const PLAYER = easedLevel(AI_LEVELS[Number(process.argv[2] ?? 3)], Number(process.env.PPACE ?? 1), 0);
 const N = Number(process.argv[3] ?? 40);
 const DELTA = Number(process.argv[4] ?? 0); const HPS = Number(process.argv[5] ?? 1);
 const lvl = (l: number) => Math.max(0, Math.min(5, l + DELTA)); const hpOf = (h?: number) => Math.round((h ?? 250) * HPS);
 function fight(seed: number, hero: string, foe: string, foeLevel: number, rules: BattleRules | undefined, maxHp: [number, number], hp?: number) {
   const s = createBattle({ seed, characters: [hero, foe], maxHp, hp: hp !== undefined ? [hp, maxHp[1]] : undefined, rules });
-  const lv = [PLAYER, AI_LEVELS[foeLevel]];
+  const lv = [PLAYER, easedLevel(AI_LEVELS[foeLevel], Number(process.env.PACE ?? 1), Number(process.env.SLIP ?? 0))];
   const rng = [{ rng: seed * 7 + 1 }, { rng: seed * 13 + 5 }];
   const next = [thinkDelay(lv[0], rng[0]), thinkDelay(lv[1], rng[1])];
   while (!s.over && s.time < 600000) {

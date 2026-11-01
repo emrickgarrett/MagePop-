@@ -3658,3 +3658,8 @@ small {
   background: rgba(255, 212, 92, 0.12);
   border: 1px solid rgba(255, 212, 92, 0.45);
 }
+.ss-diffs {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-dim);
+}

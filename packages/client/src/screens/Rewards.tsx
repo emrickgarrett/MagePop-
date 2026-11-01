@@ -1,7 +1,16 @@
 import { getCharacter } from '@magepop/core';
 import { Portrait } from '../components/Hud';
 import { equippedFrame, myBoardTheme, nextReward, rewardUnlocked, STAR_REWARDS, StarReward } from '../game/rewards';
-import { SaveData, Settings, storyHeroFor, storyStarsEarned, TOTAL_STORY_STARS } from '../game/save';
+import {
+  DIFFICULTY_ORDER,
+  SaveData,
+  Settings,
+  STORY_DIFFICULTY,
+  storyHeroFor,
+  storyStarsEarned,
+  storyStarsOn,
+  TOTAL_STARS_ALL_DIFFICULTIES,
+} from '../game/save';
 import { boardImagePath } from '../game/themes';
 import { ScreenFrame, Stars } from './Menus';
 
@@ -25,16 +34,18 @@ export function RewardsScreen({ save, onBack, onEquip }: { save: SaveData; onBac
         <div className="rewards-head">
           <Portrait ch={hero} size={72} frame={frame} />
           <div className="rh-stars">
-            <Stars n={3} size={18} /> {stars}/{TOTAL_STORY_STARS}
+            <Stars n={3} size={18} /> {stars}/{TOTAL_STARS_ALL_DIFFICULTIES}
           </div>
           <div className="rh-next muted">
             {next ? (
               <>
-                Next: <b>{next.name}</b> at {next.stars} stars ({next.stars - stars} to go). Earn stars by meeting the goals in Story mode.
+                Next: <b>{next.name}</b> at {next.stars} stars ({next.stars - stars} to go). Stars count on every difficulty, and a clear on a harder one earns
+                the easier ones too.
               </>
             ) : (
               'Every reward unlocked. You found every star!'
             )}
+            <div>{DIFFICULTY_ORDER.map((d) => `${STORY_DIFFICULTY[d].label} ${storyStarsOn(save, d)}`).join(' · ')}</div>
             <div>
               Frame: <b>{frame ? STAR_REWARDS.find((r) => r.kind === 'frame' && r.frame === frame)?.name : 'None'}</b> · Board:{' '}
               <b>{boardPicked ? STAR_REWARDS.find((r) => r.kind === 'board' && r.board === boardPicked)?.name : "Your mage's own"}</b>

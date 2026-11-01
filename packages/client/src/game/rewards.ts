@@ -1,8 +1,8 @@
 import { getCharacter } from '@magepop/core';
-import { SaveData, storyStarsEarned, TOTAL_STORY_STARS } from './save';
+import { SaveData, storyStarsEarned, TOTAL_STARS_ALL_DIFFICULTIES } from './save';
 
 /**
- * Story stars unlock cosmetics: portrait frames and board backgrounds for your side of the
+ * Story stars (counted across all three difficulties) unlock cosmetics: portrait frames and board backgrounds for your side of the
  * battle. Purely visual and local (opponents see their own settings, not yours).
  *
  * Add a reward by appending to STAR_REWARDS; thresholds above the story's total are clamped to it,
@@ -15,18 +15,18 @@ export type StarReward =
 
 const RAW: StarReward[] = [
   { id: 'frame-bronze', stars: 10, kind: 'frame', frame: 'bronze', name: 'Bronze Frame' },
-  { id: 'board-rime', stars: 20, kind: 'board', board: 'rime', name: 'Frozen Lake Board' },
-  { id: 'board-briar', stars: 30, kind: 'board', board: 'briar', name: 'Mossy Grove Board' },
-  { id: 'frame-silver', stars: 40, kind: 'frame', frame: 'silver', name: 'Silver Frame' },
-  { id: 'board-nyx', stars: 50, kind: 'board', board: 'nyx', name: 'Spellcloth Board' },
-  { id: 'board-volt', stars: 60, kind: 'board', board: 'volt', name: 'Storm Sky Board' },
-  { id: 'frame-gold', stars: 70, kind: 'frame', frame: 'gold', name: 'Gold Frame' },
-  { id: 'board-ember', stars: 80, kind: 'board', board: 'ember', name: 'Obsidian Ember Board' },
-  { id: 'board-hollow', stars: 90, kind: 'board', board: 'hollow', name: 'The Fracture Board' },
+  { id: 'board-rime', stars: 25, kind: 'board', board: 'rime', name: 'Frozen Lake Board' },
+  { id: 'board-briar', stars: 45, kind: 'board', board: 'briar', name: 'Mossy Grove Board' },
+  { id: 'frame-silver', stars: 70, kind: 'frame', frame: 'silver', name: 'Silver Frame' },
+  { id: 'board-nyx', stars: 100, kind: 'board', board: 'nyx', name: 'Spellcloth Board' },
+  { id: 'board-volt', stars: 135, kind: 'board', board: 'volt', name: 'Storm Sky Board' },
+  { id: 'frame-gold', stars: 170, kind: 'frame', frame: 'gold', name: 'Gold Frame' },
+  { id: 'board-ember', stars: 210, kind: 'board', board: 'ember', name: 'Obsidian Ember Board' },
+  { id: 'board-hollow', stars: 250, kind: 'board', board: 'hollow', name: 'The Fracture Board' },
   { id: 'frame-prismatic', stars: Infinity, kind: 'frame', frame: 'prismatic', name: 'Prismatic Frame' },
 ];
 
-export const STAR_REWARDS: StarReward[] = RAW.map((r) => ({ ...r, stars: Math.min(r.stars, TOTAL_STORY_STARS) }));
+export const STAR_REWARDS: StarReward[] = RAW.map((r) => ({ ...r, stars: Math.min(r.stars, TOTAL_STARS_ALL_DIFFICULTIES) }));
 
 export const rewardUnlocked = (save: SaveData, r: StarReward) => storyStarsEarned(save) >= r.stars;
 

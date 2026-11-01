@@ -63,9 +63,28 @@ export type Sfx =
   | 'poison'
   | 'stun'
   | 'shatter'
-  | 'ready';
+  | 'ready'
+  // Per-mage cast sounds (file only; a mage without one uses 'spell').
+  | `cast-${string}`;
 
-export const SFX_NAMES: Sfx[] = ['click', 'swap', 'invalid', 'match', 'spell', 'ultimate', 'hit', 'heal', 'shield', 'freeze', 'stone', 'poison', 'stun', 'shatter', 'ready'];
+export const SFX_NAMES: Sfx[] = [
+  'click',
+  'swap',
+  'invalid',
+  'match',
+  'spell',
+  'ultimate',
+  'hit',
+  'heal',
+  'shield',
+  'freeze',
+  'stone',
+  'poison',
+  'stun',
+  'shatter',
+  'ready',
+  ...(['ember', 'rime', 'briar', 'nyx', 'volt', 'hollow'] as const).map((m) => `cast-${m}` as const),
+];
 
 interface Deck {
   el: HTMLAudioElement;
@@ -276,6 +295,17 @@ class AudioEngine {
    * Play a sound effect. `pitch` > 1 raises it (used for combo chains), `volume` scales it
    * (the opponent's sounds play quieter than yours).
    */
+  /** Is there a recorded file for this sound (rather than the synthesized stand-in)? */
+  hasFile(name: Sfx): boolean {
+    return !!this.buffers.get(name);
+  }
+
+  /** A mage's own cast sound, or the shared spell sound if they don't have one. */
+  playCast(mage: string, opts: { pitch?: number; volume?: number } = {}) {
+    const own = `cast-${mage}` as Sfx;
+    this.play(this.hasFile(own) ? own : 'spell', opts);
+  }
+
   play(name: Sfx, opts: { pitch?: number; volume?: number } = {}) {
     const ctx = this.ensure();
     if (!ctx || this.sfxVolume <= 0) return;

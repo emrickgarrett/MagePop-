@@ -88,12 +88,19 @@ export const HISTORY_LIMIT = 200;
 
 export type StoryDifficulty = 'relaxed' | 'normal' | 'hard';
 
-/** How each story difficulty adjusts fights. */
-export const STORY_DIFFICULTY: Record<StoryDifficulty, { label: string; desc: string; level: number; hp: number; drain: number }> = {
-  relaxed: { label: 'Relaxed', desc: 'Slower opponents, less HP. For enjoying the story.', level: -1, hp: 0.85, drain: 0.7 },
-  normal: { label: 'Normal', desc: 'The intended challenge.', level: 0, hp: 1, drain: 1 },
-  hard: { label: 'Hard', desc: 'Sharper opponents with more HP.', level: 1, hp: 1.15, drain: 1.2 },
+/**
+ * How each story difficulty adjusts fights: bot level shift, then `pace` (more thinking time) and
+ * `slip` (more random moves) so bots play at a human tempo, plus enemy HP and protect drain.
+ * Tuned with core/test/story-odds.ts using a slowed Expert player as a stand-in for a person.
+ */
+export const STORY_DIFFICULTY: Record<StoryDifficulty, { label: string; desc: string; level: number; pace: number; slip: number; hp: number; drain: number }> = {
+  relaxed: { label: 'Relaxed', desc: 'Slower opponents, less HP. For enjoying the story.', level: -1, pace: 1.45, slip: 0.08, hp: 0.85, drain: 0.7 },
+  normal: { label: 'Normal', desc: 'The intended challenge.', level: 0, pace: 1.45, slip: 0.08, hp: 1, drain: 1 },
+  hard: { label: 'Hard', desc: 'Faster, sharper opponents with more HP. Bragging rights.', level: 0, pace: 1.15, slip: 0.03, hp: 1.1, drain: 1.2 },
 };
+
+/** Easiest first. Clearing a node on one difficulty also earns its stars on every easier one. */
+export const DIFFICULTY_ORDER: StoryDifficulty[] = ['relaxed', 'normal', 'hard'];
 
 export interface SaveData {
   version: 1;
@@ -106,6 +113,8 @@ export interface SaveData {
   storyStars: Record<string, number>;
   /** Which of each node's 3 star goals have ever been met (kept across attempts). */
   storyGoals: Record<string, boolean[]>;
+  /** The same per difficulty: stars are tracked separately for Relaxed, Normal and Hard. */
+  storyGoalsBy: Record<StoryDifficulty, Record<string, boolean[]>>;
   endlessBest: { wave: number; characterId: string } | null;
   /** Has seen the How to Play guide (shown before the first battle). */
   seenHowToPlay: boolean;
@@ -147,6 +156,7 @@ const fresh = (): SaveData => ({
   storyBest: {},
   storyStars: {},
   storyGoals: {},
+  storyGoalsBy: { relaxed: {}, normal: {}, hard: {} },
   endlessBest: null,
   mageStats: {},
   seenHowToPlay: false,
@@ -167,6 +177,7 @@ export function loadSave(): SaveData {
       storyBest: data.storyBest ?? {},
       storyStars: data.storyStars ?? {},
       storyGoals: data.storyGoals ?? {},
+      storyGoalsBy: data.storyGoalsBy ?? legacyGoalsBy(data),
       mageStats: data.mageStats ?? {},
       history: data.history ?? [],
       achievements: data.achievements ?? {},
@@ -206,6 +217,7 @@ export function clearStoryNode(
   nodeId: string,
   timeMs: number | null,
   goalsMet: boolean[],
+  difficulty: StoryDifficulty = 'normal',
 ): { save: SaveData; unlocked: string | null; newBest: boolean; newStars: boolean } {
   // Goals earned on different attempts all count: stars are the union of everything you've done.
   const prevGoals = save.storyGoals[nodeId] ?? [];
@@ -226,7 +238,13 @@ export function clearStoryNode(
     }
   }
   const storyGoals = { ...save.storyGoals, [nodeId]: merged };
-  const next = { ...save, storyCleared, storyBest, storyStars, storyGoals, unlocked: [...unlockedSet] };
+  // Per difficulty: this one and every easier one get the goals met this run.
+  const storyGoalsBy = { ...save.storyGoalsBy };
+  for (const d of DIFFICULTY_ORDER.slice(0, DIFFICULTY_ORDER.indexOf(difficulty) + 1)) {
+    const prev = storyGoalsBy[d][nodeId] ?? [];
+    storyGoalsBy[d] = { ...storyGoalsBy[d], [nodeId]: goalsMet.map((ok, i) => ok || !!prev[i]) };
+  }
+  const next = { ...save, storyCleared, storyBest, storyStars, storyGoals, storyGoalsBy, unlocked: [...unlockedSet] };
   writeSave(next);
   return { save: next, unlocked, newBest: newBest && prevBest !== undefined, newStars: stars > prevStars };
 }
@@ -289,7 +307,29 @@ export const TOTAL_STORY_NODES = STORY.reduce((n, c) => n + requiredNodes(c).len
 export const TOTAL_STORY_STARS = STORY.reduce((n, c) => n + c.nodes.length * 3, 0);
 
 export const storyNodesCleared = (save: SaveData) => STORY.reduce((n, c) => n + requiredNodes(c).filter((x) => save.storyCleared.includes(x.id)).length, 0);
-export const storyStarsEarned = (save: SaveData) => Object.values(save.storyStars).reduce((a, b) => a + b, 0);
+/** Star goals met on a node on one difficulty (index 0 = the win star). */
+export const goalsOn = (save: SaveData, d: StoryDifficulty, nodeId: string): boolean[] => save.storyGoalsBy[d][nodeId] ?? [];
+export const nodeStarsOn = (save: SaveData, d: StoryDifficulty, nodeId: string) => goalsOn(save, d, nodeId).filter(Boolean).length;
+export const storyStarsOn = (save: SaveData, d: StoryDifficulty) =>
+  Object.values(save.storyGoalsBy[d]).reduce((t, g) => t + g.filter(Boolean).length, 0);
+/** Stars across all three difficulties (what star rewards count). */
+export const storyStarsEarned = (save: SaveData) => DIFFICULTY_ORDER.reduce((t, d) => t + storyStarsOn(save, d), 0);
+export const TOTAL_STARS_ALL_DIFFICULTIES = TOTAL_STORY_STARS * DIFFICULTY_ORDER.length;
+
+/**
+ * Saves from before per-difficulty stars: we don't know which difficulty each star came from, so
+ * they count for Normal (and therefore Relaxed). Very old saves only stored a star count; claim
+ * only what's certain (a clear = the win star; 3 stars = all three).
+ */
+function legacyGoalsBy(data: Partial<SaveData>): SaveData['storyGoalsBy'] {
+  const goals: Record<string, boolean[]> = {};
+  for (const id of data.storyCleared ?? []) {
+    const known = data.storyGoals?.[id];
+    const n = data.storyStars?.[id] ?? 0;
+    goals[id] = known ? [...known] : [true, n >= 3, n >= 3];
+  }
+  return { relaxed: { ...goals }, normal: { ...goals }, hard: {} };
+}
 
 export function nodeOpen(save: SaveData, chap: StoryChapter, index: number): boolean {
   return nodeAvailable(chap, index, save.storyCleared, save.unlocked);

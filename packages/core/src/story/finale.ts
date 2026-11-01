@@ -87,7 +87,7 @@ export const FINALE_CHAPTER: StoryChapter = {
       title: 'Boss: The Hollow',
       opponent: 'hollow',
       aiLevel: 3,
-      opponentHp: 240,
+      opponentHp: 225,
       twist:
         'Three phases. At 66% she starts draining your board (a gem goes hollow every 8s). At 33% the Fracture collapses: more hollow gems, and she regenerates.',
       rules: {

@@ -1,11 +1,23 @@
 {
+  "cast-briar": "cast-briar.ogg",
+  "cast-ember": "cast-ember.ogg",
+  "cast-hollow": "cast-hollow.ogg",
+  "cast-nyx": "cast-nyx.ogg",
+  "cast-rime": "cast-rime.ogg",
+  "cast-volt": "cast-volt.ogg",
   "click": "click.ogg",
+  "freeze": "freeze.ogg",
+  "heal": "heal.ogg",
   "hit": "hit.ogg",
   "invalid": "invalid.ogg",
   "match": "match.ogg",
+  "poison": "poison.ogg",
   "ready": "ready.ogg",
   "shatter": "shatter.ogg",
   "shield": "shield.ogg",
+  "spell": "spell.ogg",
   "stone": "stone.ogg",
-  "swap": "swap.ogg"
+  "stun": "stun.ogg",
+  "swap": "swap.ogg",
+  "ultimate": "ultimate.ogg"
 }

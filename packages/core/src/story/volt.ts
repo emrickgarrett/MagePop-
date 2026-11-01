@@ -98,7 +98,7 @@ export const VOLT_CHAPTER: StoryChapter = {
       title: 'Boss: Ember, Final Exam',
       opponent: 'ember',
       aiLevel: 3,
-      opponentHp: 250,
+      opponentHp: 235,
       twist: 'Ember at full power, in three phases: a shield at 60% HP, then burning pressure at 30%.',
       rules: {
         phases: [

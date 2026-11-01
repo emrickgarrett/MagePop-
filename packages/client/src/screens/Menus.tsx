@@ -8,14 +8,19 @@ import { Portrait, SpellTable } from '../components/Hud';
 import { audio } from '../game/audio';
 import { isDesktop, isFullscreen, setFullscreen } from '../game/platform';
 import {
+  DIFFICULTY_ORDER,
   formatTime,
+  goalsOn,
   mageStatsOf,
   nextStoryNode,
   STORY_DIFFICULTY,
   nodeOpen,
+  nodeStarsOn,
   storyHeroFor,
   storyNodesCleared,
   storyStarsEarned,
+  storyStarsOn,
+  TOTAL_STARS_ALL_DIFFICULTIES,
   TOTAL_STORY_NODES,
   TOTAL_STORY_STARS,
 } from '../game/save';
@@ -54,7 +59,11 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
         <button className="btn big" onClick={() => go('story')}>
           Story
           <small>
-            {cleared === 0 ? 'Start your journey' : next ? `${cleared}/${TOTAL_STORY_NODES} steps · ★ ${storyStarsEarned(save)}` : `Complete! ★ ${storyStarsEarned(save)}/${TOTAL_STORY_STARS}`}
+            {cleared === 0
+              ? 'Start your journey'
+              : next
+                ? `${cleared}/${TOTAL_STORY_NODES} steps · ★ ${storyStarsEarned(save)}`
+                : `Complete! ★ ${storyStarsEarned(save)}/${TOTAL_STARS_ALL_DIFFICULTIES}`}
           </small>
         </button>
         <button className="btn big alt" onClick={() => go('quick')}>
@@ -136,11 +145,8 @@ const NODE_KIND: Record<StoryNode['kind'], string> = { lesson: 'Lesson', fight: 
  * Was star goal `i` (0 = win) ever met on this node? Saves from before goals were tracked only
  * know the count; we only claim what's certain (clearing = the first star; 3 stars = all three).
  */
-function goalMet(save: SaveData, nodeId: string, i: number): boolean {
-  const goals = save.storyGoals[nodeId];
-  if (goals) return !!goals[i];
-  const n = save.storyStars[nodeId] ?? 0;
-  return n >= 3 || (i === 0 && save.storyCleared.includes(nodeId));
+function goalMet(save: SaveData, d: StoryDifficulty, nodeId: string, i: number): boolean {
+  return !!goalsOn(save, d, nodeId)[i];
 }
 
 export function Stars({ n, size = 16 }: { n: number; size?: number }) {
@@ -174,7 +180,7 @@ export function StoryMap({
   const difficulty = save.settings.storyDifficulty ?? 'normal';
   const next = nextStoryNode(save);
   const cleared = storyNodesCleared(save);
-  const stars = storyStarsEarned(save);
+  const stars = storyStarsOn(save, difficulty);
   const [chapIdx, setChapIdx] = useState(() => Math.max(0, STORY.findIndex((c) => c === (next?.chap ?? STORY[0]))));
   const chap = STORY[chapIdx];
   const [nodeId, setNodeId] = useState<string>(() => next?.node.id ?? chap.nodes[0].id);
@@ -206,7 +212,10 @@ export function StoryMap({
             <b>
               {cleared}/{TOTAL_STORY_NODES}
             </b>{' '}
-            steps cleared · <Stars n={3} size={13} /> <b>{stars}</b>/{TOTAL_STORY_STARS} stars
+            steps cleared · <Stars n={3} size={13} /> <b>{stars}</b>/{TOTAL_STORY_STARS} stars on {STORY_DIFFICULTY[difficulty].label}
+            <span className="ss-diffs">
+              {DIFFICULTY_ORDER.map((d) => `${STORY_DIFFICULTY[d].label} ${storyStarsOn(save, d)}`).join(' · ')}
+            </span>
           </div>
           <div className="ss-bar">
             <div style={{ width: `${(cleared / TOTAL_STORY_NODES) * 100}%` }} />
@@ -235,7 +244,7 @@ export function StoryMap({
             const unlocked = chapterOpen(c, save.storyCleared, save.unlocked);
             const req = c.nodes.filter((n) => !n.optional);
             const done = req.filter((n) => save.storyCleared.includes(n.id)).length;
-            const st = c.nodes.reduce((t, n) => t + (save.storyStars[n.id] ?? 0), 0);
+            const st = c.nodes.reduce((t, n) => t + nodeStarsOn(save, difficulty, n.id), 0);
             return (
               <button
                 key={chapterId(c)}
@@ -302,7 +311,7 @@ export function StoryMap({
                 >
                   <span className="pn-icon">{isOpen ? NODE_ICON[n.kind] : '🔒'}</span>
                   <span className="pn-title">{n.optional ? 'Challenge' : NODE_KIND[n.kind]}</span>
-                  {isCleared ? <Stars n={save.storyStars[n.id] ?? 1} size={12} /> : <span className="pn-gap" />}
+                  {isCleared ? <Stars n={nodeStarsOn(save, difficulty, n.id)} size={12} /> : <span className="pn-gap" />}
                 </button>
               );
             })}
@@ -313,7 +322,7 @@ export function StoryMap({
               <span className="nc-kind">
                 {NODE_ICON[node.kind]} {node.optional ? 'Optional challenge' : NODE_KIND[node.kind]}
               </span>
-              {save.storyCleared.includes(node.id) && <Stars n={save.storyStars[node.id] ?? 1} size={20} />}
+              {save.storyCleared.includes(node.id) && <Stars n={nodeStarsOn(save, difficulty, node.id)} size={20} />}
             </div>
             <h3>{node.title}</h3>
             {node.kind === 'lesson' ? (
@@ -321,7 +330,7 @@ export function StoryMap({
                 <p className="muted">A puzzle with a fixed board and a few moves.</p>
                 <ul className="nc-goals">
                   {['Complete the lesson', 'Finish every stage', 'No hints'].map((text, i) => {
-                    const met = goalMet(save, node.id, i);
+                    const met = goalMet(save, difficulty, node.id, i);
                     return (
                       <li key={text} className={met ? 'met' : ''}>
                         {met ? '★' : '☆'} {text}
@@ -364,7 +373,7 @@ export function StoryMap({
                 {node.twist && <p className="nc-twist">{node.twist}</p>}
                 <ul className="nc-goals">
                   {[node.kind === 'survival' ? 'Survive' : 'Win', ...node.goals.map((g) => g.text)].map((text, i) => {
-                    const met = goalMet(save, node.id, i);
+                    const met = goalMet(save, difficulty, node.id, i);
                     return (
                       <li key={text} className={met ? 'met' : ''} title={met ? 'Earned' : 'Not earned yet'}>
                         {met ? '★' : '☆'} {text}

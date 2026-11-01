@@ -582,7 +582,12 @@ export class BattleController {
             this.pushFx(e.caster, e.tier === 'ultimate' ? 'ultimate' : 'spell', `${e.name}${e.tier === 'ultimate' ? '!!' : '!'}`, ch.palette.primary);
             this.flash[e.caster] = { color: `var(--gem-${e.color})`, at: this.realNow };
             // Only your casts chime; the opponent's spells are heard when they land on you.
-            if (e.caster === 0) audio.play(e.tier === 'ultimate' ? 'ultimate' : 'spell');
+            // Your casts: the mage's own sound (plus the ultimate fanfare). Theirs: quieter.
+            const mage = this.state.players[e.caster].characterId;
+            if (e.caster === 0) {
+              audio.playCast(mage);
+              if (e.tier === 'ultimate') audio.play('ultimate', { volume: 0.8 });
+            } else audio.playCast(mage, { volume: 0.4, pitch: 0.95 });
             const ult = e.tier === 'ultimate';
             if (ult) this.pushVfx({ kind: 'ultimate', side: e.caster, color: ch.palette.primary, label: e.name, theme: ch.id, power: 1 });
             else if (e.caster === 0) this.pushVfx({ kind: 'cast', side: 0, color: ch.palette.primary, label: e.name, theme: ch.id, power: 0.6 });

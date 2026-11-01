@@ -93,7 +93,7 @@ export const BRIAR_CHAPTER: StoryChapter = {
       title: 'Boss: Nyx',
       opponent: 'nyx',
       aiLevel: 3,
-      opponentHp: 255,
+      opponentHp: 240,
       twist: 'At half HP Nyx curses you every 14s.',
       rules: {
         phases: [{ atHpPct: 50 }],

@@ -30,6 +30,20 @@ export function aiLevel(i: number): AiLevel {
   return AI_LEVELS[Math.max(0, Math.min(AI_LEVELS.length - 1, i))];
 }
 
+/**
+ * The same bot, a little slower and a little sloppier. Story mode uses this so late chapters stay
+ * beatable for people (bots never hesitate; humans do). pace 1.15 = 15% more thinking time,
+ * slip 0.04 = 4 points more chance of a random move. The level keeps its name.
+ */
+export function easedLevel(level: AiLevel, pace: number, slip: number): AiLevel {
+  return {
+    ...level,
+    thinkMs: Math.round(level.thinkMs * pace),
+    thinkJitterMs: Math.round(level.thinkJitterMs * pace),
+    randomChance: Math.min(1, level.randomChance + slip),
+  };
+}
+
 /** Rough value of an effect for the caster, given the situation. */
 export function effectValue(state: BattleState, me: PlayerIndex, e: Effect): number {
   const self = state.players[me];
