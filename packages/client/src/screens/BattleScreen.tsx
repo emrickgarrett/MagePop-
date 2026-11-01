@@ -1,7 +1,7 @@
 import { getCharacter, GemColor, PlayerIndex, Pos, validMoves } from '@magepop/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BoardView } from '../components/BoardView';
-import { PlayerPanel, SpellLegend } from '../components/Hud';
+import { BelowBoardFx, PlayerPanel, SpellLegend } from '../components/Hud';
 import { SpellFxLayer } from '../components/SpellFx';
 import { HowToPlay } from '../components/HowToPlay';
 import { BattleController, BattleResult, BattleSetup } from '../game/BattleController';
@@ -155,7 +155,7 @@ export function BattleScreen({
       </div>
       <div className="arena">
         <div className="arena-side me">
-          <PlayerPanel {...me} time={s.time} side={0} tag="YOU" />
+          <PlayerPanel {...me} fx={[]} time={s.time} side={0} tag="YOU" />
           <div ref={myBoard} className={`board-wrap themed ${canAct ? 'ready' : ''}`} style={boardStyle(me.ch.id, me.ch.palette.primary)}>
             <BoardView
               theme={me.ch.id}
@@ -172,6 +172,7 @@ export function BattleScreen({
               stunned={me.stunned}
               label="Your board"
             />
+            <BelowBoardFx fx={me.fx} />
           </div>
           <SpellLegend ch={me.ch} spotlight={spotlight} />
         </div>

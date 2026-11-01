@@ -97,6 +97,23 @@ export function PlayerPanel({
   );
 }
 
+/**
+ * Your own callouts ("Fireball!", "-11", "Burn") in a compact row under your board, so nothing
+ * floats over the gems you're playing. Ultimates are left out: the ultimate strip shows those.
+ */
+export function BelowBoardFx({ fx }: { fx: FloatFx[] }) {
+  const shown = fx.filter((f) => f.kind !== 'ultimate').slice(-4);
+  return (
+    <div className="fx-below">
+      {shown.map((f) => (
+        <div key={f.id} className={`float-mini float-${f.kind}`} style={{ color: f.kind === 'spell' ? f.color : undefined }}>
+          {f.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SpellLegend({ ch, spotlight = [], compact = false }: { ch: CharacterDef; spotlight?: GemColor[]; compact?: boolean }) {
   const [hover, setHover] = useState<GemColor | null>(null);
   return (
