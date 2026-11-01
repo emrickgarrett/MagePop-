@@ -89,7 +89,23 @@ function startUpdater() {
 
 // Released builds get their version from the git tag (see .github/workflows/release.yml).
 // Local runs say "-dev" so they can't be mistaken for a release.
-ipcMain.handle('app:version', () => (app.isPackaged ? app.getVersion() : `${app.getVersion()}-dev`));
+/**
+ * Label for the corner tag: "v1.2.3" in a release, the git branch name in a local checkout
+ * (a dev build's package.json version doesn't mean anything).
+ */
+function versionLabel() {
+  if (app.isPackaged) return `v${app.getVersion()}`;
+  try {
+    // Fixed arguments, no shell: just ask git which branch this checkout is on.
+    const branch = require('child_process')
+      .execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: __dirname, encoding: 'utf8', timeout: 3000, windowsHide: true })
+      .trim();
+    return branch && branch !== 'HEAD' ? branch : 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+ipcMain.handle('app:version', () => versionLabel());
 ipcMain.handle('update:get', () => updateState);
 ipcMain.on('update:openPage', () => shell.openExternal(RELEASES_URL));
 ipcMain.on('window:setFullscreen', (e, on) => BrowserWindow.fromWebContents(e.sender)?.setFullScreen(!!on));

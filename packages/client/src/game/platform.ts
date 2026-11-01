@@ -39,6 +39,7 @@ export async function isFullscreen(): Promise<boolean> {
   return !!document.fullscreenElement;
 }
 
+/** Corner tag label: "v1.2.3" in releases, the git branch in a local checkout. */
 export const appVersion = (): Promise<string | null> => bridge?.version?.() ?? Promise.resolve(null);
 
 export const updater = {

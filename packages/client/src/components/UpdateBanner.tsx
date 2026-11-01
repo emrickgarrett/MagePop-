@@ -32,7 +32,7 @@ export function UpdateBanner() {
           </button>
         </div>
       )}
-      {version && <div className="version-tag">v{version}</div>}
+      {version && <div className="version-tag">{version}</div>}
     </div>
   );
 }
