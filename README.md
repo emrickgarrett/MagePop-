@@ -12,7 +12,7 @@ See [`docs/DESIGN.md`](docs/DESIGN.md) for rules, roster, architecture and roadm
 
 ## Getting started
 
-Requires Node 22.12+ (Node 24 LTS recommended).
+Requires Node 22.12+ (Node 26 LTS recommended).
 
 ```bash
 npm install

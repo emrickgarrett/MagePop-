@@ -27,7 +27,7 @@ export interface SaveData {
 }
 
 const KEY = 'magepop.save.v1';
-/** Saves from before the rename (the game was called MagePop). */
+/** Saves from before the rename (the game was called TaiwanPop). */
 const LEGACY_KEY = 'taiwanpop.save.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
