@@ -26,9 +26,7 @@ const FACING: Record<string, 'left' | 'right' | 'front'> = {
   rime: 'left',
   briar: 'left',
   nyx: 'left',
-  volt: 'front',
-  'volt-sad': 'right',
-  'volt-surprised': 'right',
+  volt: 'left',
   hollow: 'left',
 };
 
