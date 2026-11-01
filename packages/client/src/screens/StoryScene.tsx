@@ -16,9 +16,31 @@ function portraitSrc(id: string, expr: Expression | undefined, revealed?: boolea
   return MAIN_PORTRAIT(id);
 }
 
+/**
+ * Which way each portrait looks ('front' = straight at the camera). Actors are mirrored so they
+ * face the middle of the stage: the left one looks right, the right one looks left.
+ * Key: '<mage>' for the default, '<mage>-<expression>' to override one picture.
+ */
+const FACING: Record<string, 'left' | 'right' | 'front'> = {
+  ember: 'left',
+  rime: 'right',
+  briar: 'front',
+  nyx: 'right',
+  volt: 'front',
+  'volt-sad': 'left',
+  'volt-surprised': 'left',
+  hollow: 'right',
+};
+
+function facingOf(id: string, expr: Expression | undefined) {
+  return FACING[`${id}-${expr ?? 'neutral'}`] ?? FACING[id] ?? 'front';
+}
+
 interface Actor {
   id: string;
   src: string;
+  /** Mirror the picture so the mage faces the center. */
+  flip: boolean;
   echo: boolean;
   /** Changes when the actor first enters, so the slide-in plays once. */
   enteredAt: number;
@@ -46,7 +68,14 @@ function stageAt(lines: DialogueLine[], upTo: number, hero: string): Stage {
     const other = side === 'left' ? 'right' : 'left';
     if (st[other]?.id === id) st[other] = null;
     const prev = st[side];
-    st[side] = { id, src: portraitSrc(id, l.expr, l.revealed), echo: !!l.echo, enteredAt: prev?.id === id ? prev.enteredAt : i };
+    const facing = facingOf(id, l.expr);
+    st[side] = {
+      id,
+      src: portraitSrc(id, l.expr, l.revealed),
+      flip: facing === side,
+      echo: !!l.echo,
+      enteredAt: prev?.id === id ? prev.enteredAt : i,
+    };
     st.speakingSide = side;
   }
   return st;
@@ -150,6 +179,7 @@ export function StoryScene({ lines, hero, title, onDone }: { lines: DialogueLine
       >
         <img
           key={a.src}
+          className={a.flip ? 'flip' : ''}
           src={a.src}
           alt=""
           draggable={false}
