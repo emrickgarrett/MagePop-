@@ -17,5 +17,8 @@
     "server": "npm run start -w @magepop/server",
     "sim": "npm run sim -w @magepop/core",
     "dist": "npm run dist -w @magepop/desktop"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }
