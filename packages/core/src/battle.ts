@@ -115,6 +115,7 @@ export function createBattle(cfg: BattleConfig): BattleState {
     state.rules = rules;
     state.phase = 0;
     state.pulseNext = (rules.pulses ?? []).map((p) => ((p.fromPhase ?? 0) === 0 ? (p.firstAtMs ?? p.everyMs) : Infinity));
+    if (rules.protect) state.ally = { hp: rules.protect.hp, maxHp: rules.protect.hp, carry: 0 };
     const ctx: Ctx = { state, events: [], delay: 0 };
     for (const h of rules.start ?? []) {
       for (const p of sidesOf(h.target)) {
@@ -213,6 +214,16 @@ function firePulse(ctx: Ctx, pulse: Pulse) {
 function heal(ctx: Ctx, p: PlayerIndex, raw: number, source: string): number {
   const pl = ctx.state.players[p];
   if (ctx.state.over || sideRules(ctx.state, p)?.noHealing) return 0;
+  // Protect fights: the player's healing goes to the ally.
+  const ally = ctx.state.ally;
+  if (p === 0 && ally) {
+    const amount = Math.min(ally.maxHp - ally.hp, Math.max(0, Math.round(raw)));
+    if (amount <= 0) return 0;
+    ally.hp += amount;
+    pl.stats.healed += amount;
+    emit(ctx, { type: 'allyHeal', amount });
+    return amount;
+  }
   const amount = Math.min(pl.maxHp - pl.hp, Math.max(0, Math.round(raw)));
   if (amount <= 0) return 0;
   pl.hp += amount;
@@ -411,7 +422,8 @@ function applyEffect(ctx: Ctx, caster: PlayerIndex, e: Effect, dmgMult: number, 
         'freeze',
         (b) => {
           const cells = pickRandomCells(b, e.count, (g) => g.kind !== 'stone' && g.frozenUntil <= now);
-          for (const p of cells) getCell(b, p.r, p.c)!.frozenUntil = now + e.durationMs;
+          const mult = sideRules(state, foe)?.iceMult ?? 1;
+          for (const p of cells) getCell(b, p.r, p.c)!.frozenUntil = now + e.durationMs * mult;
           return cells;
         },
         false,
@@ -558,6 +570,20 @@ export function tick(state: BattleState, dtMs: number): BattleEvent[] {
         next[i] += pulse.everyMs;
       }
     });
+    const ally = state.ally;
+    if (!state.over && ally && rules.protect) {
+      ally.carry += (rules.protect.drainPerSec * dtMs) / 1000;
+      const whole = Math.floor(ally.carry);
+      ally.carry -= whole;
+      ally.hp = Math.max(0, ally.hp - whole);
+      if (ally.hp <= 0) {
+        state.over = true;
+        state.winner = 1;
+        emit(ctx, { type: 'allyDown' });
+        emit(ctx, { type: 'gameOver', winner: 1 });
+        return ctx.events;
+      }
+    }
     if (!state.over && rules.surviveMs !== undefined && state.time >= rules.surviveMs) {
       state.over = true;
       state.winner = 0;

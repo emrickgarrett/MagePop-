@@ -7,8 +7,8 @@ import { Gem } from '../components/Gem';
 import { Portrait, SpellTable } from '../components/Hud';
 import { audio } from '../game/audio';
 import { isDesktop, isFullscreen, setFullscreen } from '../game/platform';
-import { formatTime, mageStatsOf, nextStoryNode, nodeOpen, storyNodesCleared, storyStarsEarned, TOTAL_STORY_NODES, TOTAL_STORY_STARS } from '../game/save';
-import type { RecordStats, SaveData, Settings } from '../game/save';
+import { formatTime, mageStatsOf, nextStoryNode, STORY_DIFFICULTY, nodeOpen, storyNodesCleared, storyStarsEarned, TOTAL_STORY_NODES, TOTAL_STORY_STARS } from '../game/save';
+import type { RecordStats, SaveData, Settings, StoryDifficulty } from '../game/save';
 
 export function Logo() {
   return (
@@ -118,8 +118,19 @@ export function ScreenFrame({ title, onBack, children, right }: { title: string;
   );
 }
 
-const NODE_ICON: Record<StoryNode['kind'], string> = { lesson: '📖', fight: '⚔️', survival: '⏳', boss: '👑' };
-const NODE_KIND: Record<StoryNode['kind'], string> = { lesson: 'Lesson', fight: 'Battle', survival: 'Survival', boss: 'Boss' };
+const NODE_ICON: Record<StoryNode['kind'], string> = { lesson: '📖', fight: '⚔️', survival: '⏳', boss: '👑', gauntlet: '🔥' };
+const NODE_KIND: Record<StoryNode['kind'], string> = { lesson: 'Lesson', fight: 'Battle', survival: 'Survival', boss: 'Boss', gauntlet: 'Gauntlet' };
+
+/**
+ * Was star goal `i` (0 = win) ever met on this node? Saves from before goals were tracked only
+ * know the count; we only claim what's certain (clearing = the first star; 3 stars = all three).
+ */
+function goalMet(save: SaveData, nodeId: string, i: number): boolean {
+  const goals = save.storyGoals[nodeId];
+  if (goals) return !!goals[i];
+  const n = save.storyStars[nodeId] ?? 0;
+  return n >= 3 || (i === 0 && save.storyCleared.includes(nodeId));
+}
 
 function Stars({ n, size = 16 }: { n: number; size?: number }) {
   return (
@@ -137,11 +148,14 @@ export function StoryMap({
   save,
   onBack,
   onPlay,
+  onDifficulty,
 }: {
   save: SaveData;
   onBack: () => void;
   onPlay: (ch: StoryChapter, node: StoryNode) => void;
+  onDifficulty: (d: StoryDifficulty) => void;
 }) {
+  const difficulty = save.settings.storyDifficulty ?? 'normal';
   const next = nextStoryNode(save);
   const cleared = storyNodesCleared(save);
   const stars = storyStarsEarned(save);
@@ -172,6 +186,13 @@ export function StoryMap({
           <div className="ss-bar">
             <div style={{ width: `${(cleared / TOTAL_STORY_NODES) * 100}%` }} />
           </div>
+        </div>
+        <div className="seg story-diff" title={STORY_DIFFICULTY[difficulty].desc}>
+          {(Object.keys(STORY_DIFFICULTY) as StoryDifficulty[]).map((d) => (
+            <button key={d} className={`seg-btn ${difficulty === d ? 'on' : ''}`} onClick={() => onDifficulty(d)} title={STORY_DIFFICULTY[d].desc}>
+              {STORY_DIFFICULTY[d].label}
+            </button>
+          ))}
         </div>
         {next ? (
           <button className="btn" onClick={() => onPlay(next.chap, next.node)}>
@@ -263,28 +284,60 @@ export function StoryMap({
             </div>
             <h3>{node.title}</h3>
             {node.kind === 'lesson' ? (
-              <p className="muted">A puzzle with a fixed board and a few moves. Finish without hints for 3 stars.</p>
+              <>
+                <p className="muted">A puzzle with a fixed board and a few moves.</p>
+                <ul className="nc-goals">
+                  {['Complete the lesson', 'Finish every stage', 'No hints'].map((text, i) => {
+                    const met = goalMet(save, node.id, i);
+                    return (
+                      <li key={text} className={met ? 'met' : ''}>
+                        {met ? '★' : '☆'} {text}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             ) : (
               <>
-                <div className="nc-foe">
-                  <span className={node.echo ? 'echo-portrait' : ''}>
-                    <Portrait ch={getCharacter(node.opponent)} size={54} />
-                  </span>
-                  <div>
-                    <b>{node.echo ? `Echo of ${getCharacter(node.opponent).name}` : getCharacter(node.opponent).name}</b>
-                    <div className="muted">
-                      {AI_LEVELS[node.aiLevel].name}
-                      {node.opponentHp && node.opponentHp !== 250 ? ` · ${node.opponentHp} HP` : ''}
-                      {node.playerHp && node.playerHp !== 250 ? ` · you: ${node.playerHp} HP` : ''}
+                {node.kind === 'gauntlet' ? (
+                  <div className="nc-waves">
+                    {node.waves.map((w, i) => (
+                      <div key={i} className="nc-foe">
+                        <span className={w.echo ? 'echo-portrait' : ''}>
+                          <Portrait ch={getCharacter(w.opponent)} size={44} />
+                        </span>
+                        <div>
+                          <b>{w.echo ? `Echo of ${getCharacter(w.opponent).name}` : getCharacter(w.opponent).name}</b>
+                          <div className="muted">{AI_LEVELS[w.aiLevel].name}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="nc-foe">
+                    <span className={node.echo ? 'echo-portrait' : ''}>
+                      <Portrait ch={getCharacter(node.opponent)} size={54} locked={!!node.mystery} />
+                    </span>
+                    <div>
+                      <b>{node.mystery?.name ?? (node.echo ? `Echo of ${getCharacter(node.opponent).name}` : getCharacter(node.opponent).name)}</b>
+                      <div className="muted">
+                        {node.mystery ? '???' : AI_LEVELS[node.aiLevel].name}
+                        {node.opponentHp && node.opponentHp !== 250 && !node.mystery ? ` · ${node.opponentHp} HP` : ''}
+                        {node.playerHp && node.playerHp !== 250 ? ` · you: ${node.playerHp} HP` : ''}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 {node.twist && <p className="nc-twist">{node.twist}</p>}
                 <ul className="nc-goals">
-                  <li>★ {node.kind === 'survival' ? 'Survive' : 'Win'}</li>
-                  {node.goals.map((g) => (
-                    <li key={g.text}>★ {g.text}</li>
-                  ))}
+                  {[node.kind === 'survival' ? 'Survive' : 'Win', ...node.goals.map((g) => g.text)].map((text, i) => {
+                    const met = goalMet(save, node.id, i);
+                    return (
+                      <li key={text} className={met ? 'met' : ''} title={met ? 'Earned' : 'Not earned yet'}>
+                        {met ? '★' : '☆'} {text}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {save.storyBest[node.id] !== undefined && node.kind !== 'survival' && (
                   <div className="muted">Best time {formatTime(save.storyBest[node.id])}</div>

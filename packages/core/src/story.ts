@@ -1,6 +1,10 @@
 import { CHARACTERS, getCharacter } from './characters';
 import { describeSpell } from './describe';
+import { BRIAR_CHAPTER } from './story/briar';
 import { EMBER_CHAPTER } from './story/ember';
+import { NYX_CHAPTER } from './story/nyx';
+import { RIME_CHAPTER } from './story/rime';
+import { VOLT_CHAPTER } from './story/volt';
 import { G } from './story/goals';
 import { DialogueLine, FightNode, StoryChapter, StoryNode } from './story/types';
 import { GemColor } from './types';
@@ -86,10 +90,7 @@ function spotlightPlan(heroId: string): GemColor[][] {
   return [colors.slice(0, 2), colors.slice(2, 4), colors.slice(4)];
 }
 
-/**
- * Chapters 2-5 in their original three-fight form, converted to story nodes. They get the full
- * "Fracture" rewrite in phase 2 (see the story design doc); their ids are unchanged so progress carries over.
- */
+/** The original three-fight chapter format, used for any mage without a hand-written chapter. */
 function legacyChapter(hero: string, ci: number, order: string[]): StoryChapter {
   const flavor = FLAVOR[hero];
   const next = order[ci + 1] ?? null;
@@ -116,9 +117,19 @@ function legacyChapter(hero: string, ci: number, order: string[]): StoryChapter 
   return { hero, title: flavor.title, nodes, unlocks: next };
 }
 
+/** The five chapters of "The Fracture" (the finale comes in phase 3). */
+const CHAPTERS: Record<string, StoryChapter> = {
+  ember: EMBER_CHAPTER,
+  rime: RIME_CHAPTER,
+  briar: BRIAR_CHAPTER,
+  nyx: NYX_CHAPTER,
+  volt: VOLT_CHAPTER,
+};
+
 export function buildStory(): StoryChapter[] {
   const order = chapterOrder();
-  return order.map((hero, ci) => (hero === 'ember' ? EMBER_CHAPTER : legacyChapter(hero, ci, order)));
+  // A mage added without a written chapter still gets the classic three fights.
+  return order.map((hero, ci) => CHAPTERS[hero] ?? legacyChapter(hero, ci, order));
 }
 
 export const STORY: StoryChapter[] = buildStory();
@@ -144,6 +155,6 @@ export function nodeAvailable(chap: StoryChapter, index: number, cleared: readon
   return before.filter((n) => !n.optional).every((n) => cleared.includes(n.id));
 }
 
-export const isFightNode = (n: StoryNode): n is FightNode => n.kind !== 'lesson';
+export const isFightNode = (n: StoryNode): n is FightNode => n.kind === 'fight' || n.kind === 'survival' || n.kind === 'boss';
 
 export const STORY_NODE_COUNT = STORY.reduce((t, c) => t + requiredNodes(c).length, 0);

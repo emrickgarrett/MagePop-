@@ -197,7 +197,14 @@ export function BattleScreen({
       )}
       <div className="arena">
         <div className="arena-side me">
-          <PlayerPanel {...me} fx={[]} time={s.time} side={0} tag="YOU" />
+          <PlayerPanel
+            {...me}
+            fx={[]}
+            time={s.time}
+            side={0}
+            tag="YOU"
+            ally={s.ally && s.rules?.protect ? { name: s.rules.protect.name, hp: s.ally.hp, maxHp: s.ally.maxHp } : undefined}
+          />
           {chatOn && (
             <>
               <ChatBubble line={chat.mine} side="me" now={performance.now()} />
@@ -225,7 +232,7 @@ export function BattleScreen({
         </div>
         <div className="vs">VS</div>
         <div className={`arena-side foe ${setup.echo ? 'echo' : ''}`}>
-          <PlayerPanel {...foe} time={s.time} side={1} tag={(opponentTag ?? setup.aiLevel.name).toUpperCase()} />
+          <PlayerPanel {...foe} time={s.time} side={1} tag={(opponentTag ?? setup.aiLevel.name).toUpperCase()} mysteryName={setup.mysteryName} />
           {chatOn && <ChatBubble line={chat.theirs} side="them" now={performance.now()} />}
           {ctrl.bark && ctrl.now - ctrl.bark.at < 3200 && (
             <div key={ctrl.bark.at} className="chat-bubble them bark">

@@ -107,3 +107,31 @@ describe('encounter rules', () => {
     expect(run(s, 5000).filter((e) => e.type === 'pulse')).toHaveLength(0);
   });
 });
+
+describe('protect and ice rules', () => {
+  it('protect: the ally drains, takes your healing, and losing them loses the fight', () => {
+    const s = battle({
+      protect: { name: 'Sapling', hp: 100, drainPerSec: 10 },
+      pulses: [{ everyMs: 2000, target: 'player', label: 'Bloom', effects: [{ kind: 'heal', amount: 15 }] }],
+    });
+    s.players[0].hp = 200;
+    run(s, 2000);
+    expect(s.ally!.hp).toBe(100 - 20 + 15); // drained 20, healed 15 by the pulse
+    expect(s.players[0].hp).toBe(200); // your own HP isn't healed
+    // Net drain is 10/s minus 7.5/s of healing: the ally falls within about 40s more.
+    run(s, 45_000);
+    expect(s.over).toBe(true);
+    expect(s.winner).toBe(1);
+  });
+
+  it('ice multiplier changes how long freezes last on that side', () => {
+    const s = battle({
+      sides: [{ iceMult: 0.5 }, { iceMult: 2 }],
+      pulses: [{ everyMs: 1000, target: 'both', label: 'Frost', effects: [{ kind: 'freeze', count: 2, durationMs: 4000 }] }],
+    });
+    run(s, 1000);
+    const until = (p: 0 | 1) => Math.max(...s.players[p].board.cells.map((g) => g?.frozenUntil ?? 0));
+    expect(until(0)).toBe(1000 + 2000);
+    expect(until(1)).toBe(1000 + 8000);
+  });
+});

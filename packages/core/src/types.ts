@@ -142,6 +142,8 @@ export interface BattleState {
   phase?: number;
   /** When each rules.pulses entry fires next (battle time, ms). */
   pulseNext?: number[];
+  /** Protect fights: the ally's current HP. */
+  ally?: { hp: number; maxHp: number; carry: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +162,16 @@ export interface SideRules {
   silenced?: GemColor[];
   /** Multiplies how long each move keeps you busy (1.5 = 50% slower). */
   slowMult?: number;
+  /** Multiplies how long ice lasts on this side's board (0.5 = thaws twice as fast). */
+  iceMult?: number;
+}
+
+/** Protect fights: an ally whose HP drains; your heals go to them instead of you. */
+export interface ProtectRule {
+  name: string;
+  hp: number;
+  /** HP the ally loses per second. */
+  drainPerSec: number;
 }
 
 /** Something "the world" does on a timer: the Heartstone pulsing, a blight spreading... */
@@ -200,6 +212,8 @@ export interface BattleRules {
   surviveMs?: number;
   /** Boss phases for the opponent, in order of falling HP. */
   phases?: BossPhase[];
+  /** Protect an ally: you lose if they fall. */
+  protect?: ProtectRule;
   /**
    * Fixed starting layout for the player's board (puzzles): one string per row, one letter per cell:
    * r ruby, b sapphire, g emerald, y topaz, p amethyst, s stone; uppercase = frozen.
@@ -252,4 +266,8 @@ export type BattleEventBody =
   /** Story: a silenced color was matched and did nothing. */
   | { type: 'silenced'; caster: PlayerIndex; color: GemColor }
   /** Story: survival timer ran out with the player alive. */
-  | { type: 'survived' };
+  | { type: 'survived' }
+  /** Story (protect): your healing went to the ally. */
+  | { type: 'allyHeal'; amount: number }
+  /** Story (protect): the ally fell, so the battle is lost. */
+  | { type: 'allyDown' };

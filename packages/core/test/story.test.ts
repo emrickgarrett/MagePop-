@@ -25,23 +25,23 @@ describe('story data', () => {
           expect(LESSONS[n.lesson], n.id).toBeDefined();
           continue;
         }
-        expect(isCharacterId(n.opponent), n.id).toBe(true);
         expect(n.goals).toHaveLength(2);
-        expect(() =>
-          createBattle({
-            seed: 1,
-            characters: [c.hero, n.opponent],
-            maxHp: [n.playerHp ?? 250, n.opponentHp ?? 250],
-            rules: n.rules,
-          }),
-        ).not.toThrow();
+        const fights = n.kind === 'gauntlet' ? n.waves.map((w) => ({ ...w, playerHp: undefined })) : [n];
+        if (n.kind === 'gauntlet') expect(n.waves.length).toBeGreaterThanOrEqual(2);
+        for (const f of fights) {
+          expect(isCharacterId(f.opponent), n.id).toBe(true);
+          expect(() =>
+            createBattle({ seed: 1, characters: [c.hero, f.opponent], maxHp: [f.playerHp ?? 250, f.opponentHp ?? 250], rules: f.rules }),
+          ).not.toThrow();
+        }
       }
   });
 
   it('every lesson stage starts with no matches and can be solved within its move limit', () => {
     for (const [id, stages] of Object.entries(LESSONS))
       stages.forEach((stage, i) => {
-        const run = startPuzzle(stage, 'ember');
+        // Lessons are named after their mage (e.g. 'rime-cold-equation'), whose spells they use.
+        const run = startPuzzle(stage, id.split('-')[0]);
         expect(findGroups(run.state.players[0].board), `${id}[${i}] starts with a match`).toHaveLength(0);
         expect(solvePuzzle(stage, run), `${id}[${i}] has no solution`).not.toBeNull();
       });

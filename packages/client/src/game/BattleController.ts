@@ -131,6 +131,8 @@ export interface BattleSetup {
   rules?: BattleRules;
   /** The opponent is an Echo (gray copy). */
   echo?: boolean;
+  /** Hide the opponent's identity behind this name (story). */
+  mysteryName?: string;
   /** Story lines shown mid-fight. */
   barks?: { phase?: Record<number, { speaker: string; text: string }>; pulse?: string };
 }
@@ -689,6 +691,13 @@ export class BattleController {
         case 'silenced':
           this.later(delay, () => this.pushFx(e.caster, 'status', 'Silenced!'));
           break;
+        case 'allyHeal':
+          this.later(delay, () => {
+            this.pushFx(0, 'heal', `+${e.amount} to ally`);
+            if (this.state.rules?.protect) this.pushVfx({ kind: 'heal', side: 0, color: '#7dffa8', power: 0.5, by: 0 });
+          });
+          break;
+        case 'allyDown':
         case 'survived':
         case 'statusRemoved':
         case 'gameOver':

@@ -53,6 +53,28 @@ export interface FightNode extends NodeBase {
   barks?: { phase?: Record<number, { speaker: string; text: string }>; pulse?: string };
   /** One-line description of the twist, shown on the map. */
   twist?: string;
+  /** Hide who this really is (a hooded figure): shown as `name` with a "?" portrait. */
+  mystery?: { name: string };
+}
+
+/** One opponent in a gauntlet. */
+export interface GauntletWave {
+  opponent: string;
+  aiLevel: number;
+  echo?: boolean;
+  opponentHp?: number;
+  rules?: BattleRules;
+}
+
+/** Back-to-back opponents; your HP carries over between them. */
+export interface GauntletNode extends NodeBase {
+  kind: 'gauntlet';
+  waves: GauntletWave[];
+  /** HP restored between waves, as a percent of max (default 15). */
+  healBetweenPct?: number;
+  goals: [StarGoal, StarGoal];
+  twist?: string;
+  spotlight?: GemColor[];
 }
 
 /** A puzzle lesson (stages live in story/lessons.ts). */
@@ -61,7 +83,7 @@ export interface LessonNode extends NodeBase {
   lesson: string;
 }
 
-export type StoryNode = FightNode | LessonNode;
+export type StoryNode = FightNode | LessonNode | GauntletNode;
 
 export interface StoryChapter {
   /** The mage you play as. */

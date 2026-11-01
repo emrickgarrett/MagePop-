@@ -13,6 +13,8 @@ export interface Settings {
   battleHints: boolean;
   /** Show and use quick chat in online matches. */
   quickChat: boolean;
+  /** Story difficulty: shifts bot skill and enemy HP (see STORY_DIFFICULTY). */
+  storyDifficulty: StoryDifficulty;
   /** Display name for online matches ('' = not chosen yet). */
   playerName: string;
   /** Last mage picked for online matches. */
@@ -79,6 +81,15 @@ export interface MatchRecord {
 
 export const HISTORY_LIMIT = 200;
 
+export type StoryDifficulty = 'relaxed' | 'normal' | 'hard';
+
+/** How each story difficulty adjusts fights. */
+export const STORY_DIFFICULTY: Record<StoryDifficulty, { label: string; desc: string; level: number; hp: number; drain: number }> = {
+  relaxed: { label: 'Relaxed', desc: 'Slower opponents, less HP. For enjoying the story.', level: -1, hp: 0.85, drain: 0.7 },
+  normal: { label: 'Normal', desc: 'The intended challenge.', level: 0, hp: 1, drain: 1 },
+  hard: { label: 'Hard', desc: 'Sharper opponents with more HP.', level: 1, hp: 1.15, drain: 1.2 },
+};
+
 export interface SaveData {
   version: 1;
   unlocked: string[];
@@ -88,6 +99,8 @@ export interface SaveData {
   storyBest: Record<string, number>;
   /** Most stars earned per story node (0-3). */
   storyStars: Record<string, number>;
+  /** Which of each node's 3 star goals have ever been met (kept across attempts). */
+  storyGoals: Record<string, boolean[]>;
   endlessBest: { wave: number; characterId: string } | null;
   /** Has seen the How to Play guide (shown before the first battle). */
   seenHowToPlay: boolean;
@@ -112,6 +125,7 @@ export const DEFAULT_SETTINGS: Settings = {
   skipReplayDialogue: false,
   battleHints: true,
   quickChat: true,
+  storyDifficulty: 'normal',
   playerName: '',
   pvpMage: null,
   musicVolume: 0.6,
@@ -124,6 +138,7 @@ const fresh = (): SaveData => ({
   storyCleared: [],
   storyBest: {},
   storyStars: {},
+  storyGoals: {},
   endlessBest: null,
   mageStats: {},
   seenHowToPlay: false,
@@ -143,6 +158,7 @@ export function loadSave(): SaveData {
       ...data,
       storyBest: data.storyBest ?? {},
       storyStars: data.storyStars ?? {},
+      storyGoals: data.storyGoals ?? {},
       mageStats: data.mageStats ?? {},
       history: data.history ?? [],
       achievements: data.achievements ?? {},
@@ -181,8 +197,12 @@ export function clearStoryNode(
   save: SaveData,
   nodeId: string,
   timeMs: number | null,
-  stars: number,
+  goalsMet: boolean[],
 ): { save: SaveData; unlocked: string | null; newBest: boolean; newStars: boolean } {
+  // Goals earned on different attempts all count: stars are the union of everything you've done.
+  const prevGoals = save.storyGoals[nodeId] ?? [];
+  const merged = goalsMet.map((ok, i) => ok || !!prevGoals[i]);
+  const stars = merged.filter(Boolean).length;
   const storyCleared = save.storyCleared.includes(nodeId) ? save.storyCleared : [...save.storyCleared, nodeId];
   const prevBest = save.storyBest[nodeId];
   const newBest = timeMs !== null && (prevBest === undefined || timeMs < prevBest);
@@ -197,7 +217,8 @@ export function clearStoryNode(
       unlocked = ch.unlocks;
     }
   }
-  const next = { ...save, storyCleared, storyBest, storyStars, unlocked: [...unlockedSet] };
+  const storyGoals = { ...save.storyGoals, [nodeId]: merged };
+  const next = { ...save, storyCleared, storyBest, storyStars, storyGoals, unlocked: [...unlockedSet] };
   writeSave(next);
   return { save: next, unlocked, newBest: newBest && prevBest !== undefined, newStars: stars > prevStars };
 }

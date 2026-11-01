@@ -15,6 +15,7 @@ import {
   tick,
   TIMING,
   describeSpell,
+  LESSONS,
 } from '../src';
 
 function boardFrom(rows: string[]): Board {
@@ -131,10 +132,12 @@ describe('content', () => {
   it('story chapters unlock every character in order', () => {
     expect(STORY.map((c) => c.hero)).toEqual(CHARACTERS.map((c) => c.id));
     expect(STORY.map((c) => c.unlocks)).toEqual(['rime', 'briar', 'nyx', 'volt', null]);
-    // Legacy chapters still teach all five colors through their fights (Ember's new chapter uses lessons too).
-    for (const ch of STORY.slice(1)) {
-      const taught = ch.nodes.flatMap((n) => (n.kind === 'lesson' ? [] : (n.spotlight ?? [])));
-      expect(new Set(taught).size).toBe(5);
+    // Every chapter teaches all five of its mage's spells, through lessons or fight highlights.
+    for (const ch of STORY) {
+      const taught = ch.nodes.flatMap((n) =>
+        n.kind === 'lesson' ? LESSONS[n.lesson].flatMap((st) => ('color' in st.goal && st.goal.color ? [st.goal.color] : [])) : (n.spotlight ?? []),
+      );
+      expect(new Set(taught).size, ch.hero).toBe(5);
     }
   });
 });

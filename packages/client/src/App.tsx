@@ -1,4 +1,4 @@
-import { aiLevel, CHARACTERS, DialogueLine, FightSummary, GemColor, getCharacter, LESSONS, RULES, ServerMessage, StoryChapter, StoryNode } from '@magepop/core';
+import { aiLevel, BattleRules, CHARACTERS, DialogueLine, FightSummary, GemColor, getCharacter, LESSONS, RULES, ServerMessage, StoryChapter, StoryNode } from '@magepop/core';
 import { useEffect, useRef, useState } from 'react';
 import { audio, MusicTrack } from './game/audio';
 import { BattleController, BattleResult, BattleSetup } from './game/BattleController';
@@ -6,6 +6,8 @@ import { isDesktop, quitApp } from './game/platform';
 import {
   addHistory,
   clearStoryNode,
+  STORY_DIFFICULTY,
+  StoryDifficulty,
   formatTime,
   loadSave,
   MatchMode,
@@ -179,7 +181,7 @@ export function App() {
   // ---- Story --------------------------------------------------------------
   /** After a story node: save stars, show the result, offer the next node. */
   const finishNode = (chap: StoryChapter, node: StoryNode, res: { stars: number; timeMs: number | null; goals: { text: string; ok: boolean }[] }, r?: BattleResult) => {
-    const { save: s2, unlocked, newBest } = clearStoryNode(saveRef.current, node.id, res.timeMs, res.stars);
+    const { save: s2, unlocked, newBest } = clearStoryNode(saveRef.current, node.id, res.timeMs, res.goals.map((g) => g.ok));
     setSave(s2);
     const idx = chap.nodes.indexOf(node);
     // Next required node in this chapter (challenges are optional, so skip past them).
@@ -233,64 +235,106 @@ export function App() {
         });
         return;
       }
-      const foeName = node.echo ? `Echo of ${getCharacter(node.opponent).name}` : getCharacter(node.opponent).name;
-      setScreen({
-        name: 'battle',
-        setup: {
-          seed: newSeed(),
-          player: chap.hero,
-          opponent: node.opponent,
-          aiLevel: aiLevel(node.aiLevel),
-          maxHp: [node.playerHp ?? RULES.maxHp, node.opponentHp ?? RULES.maxHp],
-          rules: node.rules,
-          echo: node.echo,
-          barks: node.barks,
-        },
-        header: `Story · ${hero.name} · ${node.title}`,
-        mode: 'story',
-        detail: node.title,
-        opponentTag: node.echo ? 'ECHO' : undefined,
-        spotlight: node.spotlight,
-        music: battleTheme(node.kind === 'boss' ? node.opponent : chap.hero),
-        onEnd: (r) => {
-          if (!r.won) {
-            setScreen({
-              name: 'result',
-              info: {
-                won: false,
-                title: 'Defeated',
-                subtitle:
-                  node.kind === 'survival'
-                    ? `The ${foeName} was too much this time. Hold out a little longer!`
-                    : `${foeName} wins this round. Check the spell list and try again!`,
-                stats: statsOf(r),
-                actions: [
-                  { label: 'Rematch', primary: true, onClick: () => playStory(chap, node, true) },
-                  { label: 'Story map', onClick: () => setScreen({ name: 'story' }) },
-                ],
-              },
-            });
-            return;
-          }
-          const me = r.state.players[0];
-          const summary: FightSummary = {
-            won: true,
-            durationMs: r.durationMs,
-            hpLeft: me.hp,
-            maxHp: me.maxHp,
-            lowestHp: r.lowestHp,
-            spells: me.stats.spells,
-            ultimates: me.stats.ultimates,
-            healed: me.stats.healed,
-            damageDealt: me.stats.damageDealt,
-          };
-          const goals = [
-            { text: node.kind === 'survival' ? 'Survive' : 'Win', ok: true },
-            ...node.goals.map((g) => ({ text: g.text, ok: g.check(summary) })),
-          ];
-          finishNode(chap, node, { stars: goals.filter((g) => g.ok).length, timeMs: node.kind === 'survival' ? null : r.durationMs, goals }, r);
-        },
-      });
+      // One battle of this node: a whole fight, or one wave of a gauntlet.
+      type Wave = { opponent: string; aiLevel: number; echo?: boolean; opponentHp?: number; rules?: BattleRules };
+      const waves: Wave[] = node.kind === 'gauntlet' ? node.waves : [node];
+      const fightNode = node.kind === 'gauntlet' ? null : node;
+      const foeNameOf = (w: Wave) =>
+        fightNode?.mystery?.name ?? (w.echo ? `Echo of ${getCharacter(w.opponent).name}` : getCharacter(w.opponent).name);
+      const lose = (r: BattleResult, w: Wave) =>
+        setScreen({
+          name: 'result',
+          info: {
+            won: false,
+            title: 'Defeated',
+            subtitle:
+              r.state.ally && r.state.ally.hp <= 0
+                ? `The ${node.kind !== 'gauntlet' && node.rules?.protect?.name} fell. Keep it healed!`
+                : node.kind === 'survival'
+                  ? `${foeNameOf(w)} was too much this time. Hold out a little longer!`
+                  : `${foeNameOf(w)} wins this round. Check the spell list and try again!` +
+                    (saveRef.current.settings.storyDifficulty !== 'relaxed' ? ' (Too tough? Try Relaxed difficulty on the Story screen.)' : ''),
+            stats: statsOf(r),
+            actions: [
+              { label: 'Rematch', primary: true, onClick: () => playStory(chap, node, true) },
+              { label: 'Story map', onClick: () => setScreen({ name: 'story' }) },
+            ],
+          },
+        });
+
+      // Running totals across gauntlet waves (a single fight is a gauntlet of one).
+      const fightWave = (i: number, hp: number | undefined, acc: FightSummary | null) => {
+        const w = waves[i];
+        // Story difficulty: bot skill one level up/down, enemy HP and ally drain scaled (survival foes are untouchable anyway).
+        const diff = STORY_DIFFICULTY[saveRef.current.settings.storyDifficulty ?? 'normal'];
+        const foeHp = node.kind === 'survival' ? (w.opponentHp ?? RULES.maxHp) : Math.round((w.opponentHp ?? RULES.maxHp) * diff.hp);
+        const rules: BattleRules | undefined = w.rules?.protect
+          ? { ...w.rules, protect: { ...w.rules.protect, drainPerSec: w.rules.protect.drainPerSec * diff.drain } }
+          : w.rules;
+        const maxHp: [number, number] = [fightNode?.playerHp ?? RULES.maxHp, foeHp];
+        setScreen({
+          name: 'battle',
+          setup: {
+            seed: newSeed(),
+            player: chap.hero,
+            opponent: w.opponent,
+            aiLevel: aiLevel(w.aiLevel + diff.level),
+            maxHp,
+            hp: hp !== undefined ? [hp, maxHp[1]] : undefined,
+            rules,
+            echo: w.echo,
+            barks: fightNode?.barks,
+            mysteryName: fightNode?.mystery?.name,
+          },
+          header: `Story · ${hero.name} · ${node.title}${waves.length > 1 ? ` · ${i + 1}/${waves.length}` : ''}`,
+          mode: 'story',
+          detail: node.title,
+          opponentTag: fightNode?.mystery ? '???' : w.echo ? 'ECHO' : undefined,
+          spotlight: node.spotlight,
+          music: battleTheme(node.kind === 'boss' ? w.opponent : chap.hero),
+          onEnd: (r) => {
+            if (!r.won) return lose(r, w);
+            const me = r.state.players[0];
+            const total: FightSummary = {
+              won: true,
+              durationMs: (acc?.durationMs ?? 0) + r.durationMs,
+              hpLeft: me.hp,
+              maxHp: me.maxHp,
+              lowestHp: Math.min(acc?.lowestHp ?? Infinity, r.lowestHp),
+              spells: (acc?.spells ?? 0) + me.stats.spells,
+              ultimates: (acc?.ultimates ?? 0) + me.stats.ultimates,
+              healed: (acc?.healed ?? 0) + me.stats.healed,
+              damageDealt: (acc?.damageDealt ?? 0) + me.stats.damageDealt,
+            };
+            if (i + 1 < waves.length) {
+              // Between waves: a breather, some HP back, then the next Echo.
+              const heal = Math.round((me.maxHp * (node.kind === 'gauntlet' ? (node.healBetweenPct ?? 15) : 0)) / 100);
+              const carried = Math.min(me.maxHp, me.hp + heal);
+              const nextFoe = foeNameOf(waves[i + 1]);
+              setScreen({
+                name: 'result',
+                info: {
+                  won: true,
+                  title: `${i + 1} down, ${waves.length - i - 1} to go!`,
+                  subtitle: `HP restored to ${carried}/${me.maxHp}. Next: ${nextFoe}.`,
+                  stats: statsOf(r),
+                  actions: [
+                    { label: `Next: ${nextFoe}`, primary: true, onClick: () => fightWave(i + 1, carried, total) },
+                    { label: 'Give up', onClick: () => setScreen({ name: 'story' }) },
+                  ],
+                },
+              });
+              return;
+            }
+            const goals = [
+              { text: node.kind === 'survival' ? 'Survive' : 'Win', ok: true },
+              ...node.goals.map((g) => ({ text: g.text, ok: g.check(total) })),
+            ];
+            finishNode(chap, node, { stars: goals.filter((g) => g.ok).length, timeMs: node.kind === 'survival' ? null : total.durationMs, goals }, r);
+          },
+        });
+      };
+      fightWave(0, undefined, null);
     };
     if (skipDialogue) start();
     else setScreen({ name: 'dialogue', lines: node.intro, title: `${hero.name} · ${node.title}`, theme: chap.hero, then: start });
@@ -493,7 +537,18 @@ export function App() {
           />
         );
       case 'story':
-        return <StoryMap save={save} onBack={menu} onPlay={(c, n) => playStory(c, n)} />;
+        return (
+          <StoryMap
+            save={save}
+            onBack={menu}
+            onPlay={(c, n) => playStory(c, n)}
+            onDifficulty={(d) => {
+              const s2 = { ...saveRef.current, settings: { ...saveRef.current.settings, storyDifficulty: d } };
+              writeSave(s2);
+              setSave(s2);
+            }}
+          />
+        );
       case 'puzzle':
         return (
           <PuzzleScreen

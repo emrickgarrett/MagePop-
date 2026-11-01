@@ -3368,8 +3368,17 @@ small {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 16px;
-  color: #ffd36b;
   font-size: 14px;
+}
+/* Unearned goals are grey; earned ones stay gold. */
+.nc-goals li {
+  color: var(--ink-dim);
+  opacity: 0.7;
+}
+.nc-goals li.met {
+  color: #ffd36b;
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(255, 211, 107, 0.4);
 }
 .node-card .btn {
   align-self: flex-start;
@@ -3434,4 +3443,43 @@ small {
     transform: translateX(-50%) scale(0.5);
     opacity: 0;
   }
+}
+
+/* Protect fights: the ally's health under your HP bar */
+.ally-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b8ffcf;
+}
+.ally-track {
+  flex: 1;
+  height: 10px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.ally-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #4cd97b, #b8ff9c);
+  transition: width 0.3s;
+}
+.ally-fill.low {
+  background: linear-gradient(90deg, #ff8a5b, #ffd36b);
+  animation: selpulse 0.6s ease-in-out infinite alternate;
+}
+.nc-waves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+}
+.story-diff {
+  flex-shrink: 0;
+}
+.story-summary {
+  gap: 14px;
 }

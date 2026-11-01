@@ -37,6 +37,8 @@ export function PlayerPanel({
   shakeAge,
   flash,
   tag,
+  mysteryName,
+  ally,
 }: {
   ch: CharacterDef;
   pl: PlayerState;
@@ -47,6 +49,10 @@ export function PlayerPanel({
   shakeAge: number;
   flash: { color: string; age: number } | null;
   tag: string;
+  /** Story: a hidden identity (shown with a "?" portrait instead of the real mage). */
+  mysteryName?: string;
+  /** Story (protect): the ally you're keeping alive. */
+  ally?: { name: string; hp: number; maxHp: number };
 }) {
   const pct = (vitals.hp / vitals.maxHp) * 100;
   const shieldPct = Math.min(100, (vitals.shield / vitals.maxHp) * 100);
@@ -63,11 +69,11 @@ export function PlayerPanel({
   return (
     <div className={`player-panel side-${side} ${shakeAge < 300 ? 'shake' : ''}`}>
       {flash && flash.age < 600 && <div className="cast-flash" style={{ background: flash.color }} />}
-      <Portrait ch={ch} size={side === 0 ? 84 : 72} />
+      <Portrait ch={ch} size={side === 0 ? 84 : 72} locked={!!mysteryName} />
       <div className="pp-main">
         <div className="pp-name">
           <span className="pp-tag">{tag}</span>
-          {ch.name} <small>{ch.title}</small>
+          {mysteryName ?? ch.name} {!mysteryName && <small>{ch.title}</small>}
         </div>
         <div className="hp-bar">
           <div className="hp-trail" style={{ width: `${pct}%` }} />
@@ -78,6 +84,15 @@ export function PlayerPanel({
             {vitals.shield > 0 && <span className="shield-num"> +{vitals.shield}</span>}
           </div>
         </div>
+        {ally && (
+          <div className="ally-bar" title={`Keep ${ally.name} alive: your healing goes to them`}>
+            <span>🌱 {ally.name}</span>
+            <div className="ally-track">
+              <div className={`ally-fill ${ally.hp / ally.maxHp < 0.3 ? 'low' : ''}`} style={{ width: `${(ally.hp / ally.maxHp) * 100}%` }} />
+            </div>
+            <b>{Math.ceil(ally.hp)}</b>
+          </div>
+        )}
         <div className="chips">
           {chips.map((c, i) => (
             <span key={i} className={`chip chip-${c.cls}`}>
