@@ -2812,3 +2812,16 @@ small {
 .mp-search > div:nth-child(2) {
   min-width: 180px;
 }
+
+/* Multiplayer menu button */
+.btn.alt3 {
+  background: linear-gradient(180deg, #e2c4ff, #a764ff 55%, #6f33d6);
+  box-shadow:
+    0 5px 0 #3f1786,
+    0 10px 24px rgba(0, 0, 0, 0.35),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5);
+  color: #fff;
+}
+.btn.alt3 small {
+  color: #f1e4ff;
+}

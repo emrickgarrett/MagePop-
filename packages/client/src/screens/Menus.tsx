@@ -54,9 +54,9 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
           Endless
           <small>{save.endlessBest ? `Best: wave ${save.endlessBest.wave} with ${getCharacter(save.endlessBest.characterId).name}` : 'How long can you last?'}</small>
         </button>
-        <button className="btn big muted-btn" onClick={() => go('pvp')}>
+        <button className="btn big alt3" onClick={() => go('pvp')}>
           Multiplayer
-          <small>Online battles · coming soon</small>
+          <small>Quick Match or battle a friend</small>
         </button>
       </div>
       <div className="menu-row">
@@ -572,7 +572,7 @@ function MageStatsPanel({ save, id }: { save: SaveData; id: string }) {
   return (
     <div className="mage-stats">
       <RecordRow label="vs Bots" rec={st.bots} />
-      <RecordRow label="Online" rec={st.pvp} note={st.pvp.wins + st.pvp.losses ? undefined : 'coming soon'} />
+      <RecordRow label="Online" rec={st.pvp} />
     </div>
   );
 }
