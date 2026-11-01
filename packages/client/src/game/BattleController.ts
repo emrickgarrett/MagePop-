@@ -20,6 +20,7 @@ import {
   TIMING,
   COLOR_LABEL,
   Effect,
+  MatchEndReason,
   GemColor,
 } from '@magepop/core';
 import { audio, Sfx } from './audio';
@@ -128,6 +129,8 @@ export interface BattleSetup {
 
 export interface BattleResult {
   won: boolean;
+  /** Online only: why the match ended. */
+  reason?: MatchEndReason;
   state: BattleState;
   durationMs: number;
   /** Your lowest HP during the match. */
@@ -227,6 +230,8 @@ export class BattleController {
   flash: [{ color: string; at: number } | null, { color: string; at: number } | null] = [null, null];
   paused = false;
   ended = false;
+  /** Countdown before play starts; online matches use the server's. */
+  countdownMs?: number;
   /** Your lowest HP so far (for achievements). */
   lowestHp: number;
   readonly startHp: number;
@@ -243,12 +248,13 @@ export class BattleController {
   private aiRng: { rng: number };
   private aiNextAt: number | null = null;
   private endAt: number | null = null;
-  private onEnd: (r: BattleResult) => void;
+  protected onEnd: (r: BattleResult) => void;
 
-  constructor(setup: BattleSetup, onEnd: (r: BattleResult) => void) {
+  /** `initial`: start from a given state instead of a fresh battle (online matches). */
+  constructor(setup: BattleSetup, onEnd: (r: BattleResult) => void, initial?: BattleState) {
     this.setup = setup;
     this.onEnd = onEnd;
-    this.state = createBattle({ seed: setup.seed, characters: [setup.player, setup.opponent], hp: setup.hp });
+    this.state = initial ?? createBattle({ seed: setup.seed, characters: [setup.player, setup.opponent], hp: setup.hp });
     this.aiRng = { rng: (setup.seed * 2654435761) >>> 0 };
     const mk = (p: PlayerIndex): DisplayBoard => ({
       frame: { board: cloneBoard(this.state.players[p].board), marks: new Map(), drops: new Map(), durationMs: 0, moveMs: 0 },
@@ -278,8 +284,13 @@ export class BattleController {
     return d.queue.length === 0 && d.elapsed >= d.frame.durationMs;
   }
 
+  /** Local battles freeze while paused; online ones can't (see NetBattleController). */
+  protected isPaused() {
+    return this.paused;
+  }
+
   canAct(p: PlayerIndex = 0): boolean {
-    return !this.paused && !this.ended && this.boardIdle(p) && canMove(this.state, p) === null;
+    return !this.isPaused() && !this.ended && this.boardIdle(p) && canMove(this.state, p) === null;
   }
 
   humanMove(a: Pos, b: Pos) {
@@ -293,12 +304,11 @@ export class BattleController {
     if (this.lastReal < 0) this.lastReal = realMs;
     const dt = Math.min(50, realMs - this.lastReal);
     this.lastReal = realMs;
-    if (this.paused) return;
+    if (this.isPaused()) return;
     this.realNow += dt;
 
-    if (!this.state.over) this.handleEvents(tick(this.state, dt));
+    this.simulate(dt);
     this.trackMe();
-    this.runAi();
     for (const d of this.display) this.advanceDisplay(d, dt);
 
     const due = this.scheduled.filter((s) => s.at <= this.realNow);
@@ -318,6 +328,12 @@ export class BattleController {
         this.onEnd({ ...this.snapshot(), won: this.state.winner === 0 });
       }
     }
+  }
+
+  /** Advance the battle itself. Local: run the engine and the bot. Online: the server does this. */
+  protected simulate(dt: number) {
+    if (!this.state.over) this.handleEvents(tick(this.state, dt));
+    this.runAi();
   }
 
   /** Running facts about your side for achievements. */
@@ -478,7 +494,7 @@ export class BattleController {
     }
   }
 
-  private handleEvents(events: BattleEvent[]) {
+  protected handleEvents(events: BattleEvent[]) {
     // Events after a 'spell' belong to it until the next spell/basic. If it targets the opponent,
     // everything landing on them waits for the projectile.
     let flying: { caster: PlayerIndex } | null = null;

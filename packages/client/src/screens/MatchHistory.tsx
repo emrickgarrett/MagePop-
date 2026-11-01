@@ -93,7 +93,7 @@ function HistoryRow({ m }: { m: MatchRecord }) {
   const foe = getCharacter(m.opponent);
   return (
     <div className={`history-row ${m.result}`} style={{ '--accent': me.palette.primary } as React.CSSProperties}>
-      <div className={`result-pill ${m.result}`}>{m.result === 'win' ? 'WIN' : m.result === 'loss' ? 'LOSS' : 'QUIT'}</div>
+      <div className={`result-pill ${m.result}`}>{m.result === 'win' ? 'WIN' : m.result === 'loss' ? 'LOSS' : m.result === 'draw' ? 'DRAW' : 'QUIT'}</div>
       <div className="hr-mages">
         <Portrait ch={me} size={40} />
         <span className="hr-vs">vs</span>
@@ -101,11 +101,11 @@ function HistoryRow({ m }: { m: MatchRecord }) {
       </div>
       <div className="hr-what">
         <b>
-          {me.name} vs {foe.name}
+          {me.name} vs {m.opponentName ? `${m.opponentName} (${foe.name})` : foe.name}
         </b>
         <small>
           {MODE_LABEL[m.mode]}
-          {m.mode !== 'quick' && ` · ${m.detail}`}
+          {m.mode !== 'quick' && m.mode !== 'pvp' && ` · ${m.detail}`}
           {m.level && ` · ${m.level}`}
         </small>
       </div>

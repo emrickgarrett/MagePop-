@@ -133,6 +133,9 @@ const EXAMPLES: Record<string, Example> = {
   'ice-to-meet-you': { match: { result: 'loss', frozenAndStunned: true } },
   'slow-and-steady': { match: { levelId: 'adept', level: 'Adept', ultimates: 0 } },
   'long-game': { save: withTotals({ matches: 100 }) },
+  'online-debut': { match: { mode: 'pvp', level: undefined, levelId: undefined, opponentName: 'Rival' } },
+  'online-10': { save: (s) => ({ ...s, mageStats: { ember: { bots: { wins: 0, losses: 0, fastestWinMs: null }, pvp: { wins: 10, losses: 3, fastestWinMs: 1 } } } }) },
+  'online-50': { save: (s) => ({ ...s, mageStats: { ember: { bots: { wins: 0, losses: 0, fastestWinMs: null }, pvp: { wins: 50, losses: 3, fastestWinMs: 1 } } } }) },
   ...Object.fromEntries(
     CHARACTERS.flatMap((c) => [
       [`mage-${c.id}-10`, { save: winsAs(c.id, 10) }],

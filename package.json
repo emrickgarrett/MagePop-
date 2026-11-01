@@ -12,7 +12,7 @@
     "build": "npm run build -w @magepop/client",
     "desktop": "npm run build && npm run start -w @magepop/desktop",
     "desktop:dev": "npm run dev:electron -w @magepop/desktop",
-    "test": "npm run test -w @magepop/core -w @magepop/client",
+    "test": "npm run test -w @magepop/core -w @magepop/client -w @magepop/server",
     "typecheck": "tsc -p packages/core && tsc -p packages/client && tsc -p packages/server",
     "server": "npm run start -w @magepop/server",
     "sim": "npm run sim -w @magepop/core",

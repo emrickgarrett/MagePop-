@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
-    "bots": "tsx src/botClient.ts"
+    "bots": "tsx src/botClient.ts",
+    "test": "vitest run",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/server.cjs --external:bufferutil --external:utf-8-validate --legal-comments=none"
   },
   "dependencies": {
     "@magepop/core": "*",
@@ -14,7 +16,9 @@
   "devDependencies": {
     "@types/node": "^22.10.1",
     "@types/ws": "^8.5.13",
+    "esbuild": "^0.25.12",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^5.0.5"
   }
 }

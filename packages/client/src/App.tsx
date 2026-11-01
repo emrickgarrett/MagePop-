@@ -1,7 +1,7 @@
-import { aiLevel, CHARACTERS, DialogueLine, getCharacter, RULES, StoryChapter, StoryFight } from '@magepop/core';
+import { aiLevel, CHARACTERS, DialogueLine, getCharacter, RULES, ServerMessage, StoryChapter, StoryFight } from '@magepop/core';
 import { useEffect, useRef, useState } from 'react';
 import { audio, MusicTrack } from './game/audio';
-import { BattleResult, BattleSetup } from './game/BattleController';
+import { BattleController, BattleResult, BattleSetup } from './game/BattleController';
 import { isDesktop, quitApp } from './game/platform';
 import {
   addHistory,
@@ -17,16 +17,18 @@ import {
   writeSave,
 } from './game/save';
 import { BattleScreen } from './screens/BattleScreen';
+import { MultiplayerLobby } from './screens/Multiplayer';
+import { NetBattleController, pvp } from './game/pvp';
 import { AchievementsScreen, AchievementToasts, Toast, toastsFor } from './screens/Achievements';
 import { evaluateAchievements } from './game/achievements';
 import { MatchHistory } from './screens/MatchHistory';
-import { CharacterSelect, Collection, DialogueScreen, MainMenu, PvpComingSoon, ResultInfo, ResultScreen, SettingsScreen, StoryMap } from './screens/Menus';
+import { CharacterSelect, Collection, DialogueScreen, MainMenu, ResultInfo, ResultScreen, SettingsScreen, StoryMap } from './screens/Menus';
 
 type Screen =
   | { name: 'menu' }
   | { name: 'story' }
   | { name: 'collection' }
-  | { name: 'pvp' }
+  | { name: 'pvp'; autoQueue?: boolean }
   | { name: 'settings' }
   | { name: 'select'; mode: 'quick' | 'endless' }
   | {
@@ -46,6 +48,9 @@ type Screen =
       detail: string;
       /** Endless wave number. */
       wave?: number;
+      /** Online: the opponent's display name and a controller fed by the server. */
+      opponentName?: string;
+      makeController?: (onEnd: (r: BattleResult) => void) => BattleController;
       spotlight?: StoryFight['spotlight'];
       onEnd: (r: BattleResult) => void;
       music: MusicTrack;
@@ -97,6 +102,7 @@ function historyEntry(screen: Extract<Screen, { name: 'battle' }>, r: BattleResu
     detail: screen.detail,
     player: screen.setup.player,
     opponent: screen.setup.opponent,
+    opponentName: screen.opponentName,
     level: screen.mode === 'pvp' ? undefined : screen.setup.aiLevel.name,
     levelId: screen.mode === 'pvp' ? undefined : screen.setup.aiLevel.id,
     result,
@@ -261,6 +267,50 @@ export function App() {
       });
   };
 
+  // ---- Online -------------------------------------------------------------
+  const playOnline = (found: Extract<ServerMessage, { t: 'matchFound' }>) => {
+    const mine = found.state.players[found.you].characterId;
+    const name = found.opponent.name;
+    setScreen({
+      name: 'battle',
+      // seed only keys the screen; the server owns the real battle.
+      setup: { seed: newSeed(), player: mine, opponent: found.opponent.characterId, aiLevel: aiLevel(0) },
+      header: `Online · vs ${name} (${getCharacter(found.opponent.characterId).name})`,
+      mode: 'pvp',
+      detail: 'Online',
+      opponentName: name,
+      music: battleTheme(mine),
+      makeController: (onEnd) => new NetBattleController(pvp, found, onEnd),
+      onEnd: (r) => {
+        const draw = r.state.winner === null && r.reason === 'timeout';
+        const why: Record<string, string> = r.won
+          ? { ko: `You beat ${name}!`, forfeit: `${name} forfeited.`, disconnect: `${name} disconnected.`, timeout: "Time's up, and you had more HP." }
+          : { ko: `${name} wins this round.`, disconnect: 'You lost connection to the match.', timeout: "Time's up, and they had more HP.", forfeit: 'You forfeited.' };
+        const cancelled = r.reason === 'server';
+        setScreen({
+          name: 'result',
+          info: {
+            won: r.won,
+            title: cancelled ? 'Match cancelled' : draw ? 'Draw!' : r.won ? 'Victory!' : 'Defeated',
+            subtitle: cancelled ? "The server restarted, so this match doesn't count." : draw ? "Time's up with HP tied." : why[r.reason ?? 'ko'],
+            stats: statsOf(r),
+            actions: [
+              { label: 'Rematch', primary: true, onClick: () => setScreen({ name: 'pvp', autoQueue: true }) },
+              { label: 'Multiplayer', onClick: () => setScreen({ name: 'pvp' }) },
+              {
+                label: 'Main menu',
+                onClick: () => {
+                  pvp.close();
+                  menu();
+                },
+              },
+            ],
+          },
+        });
+      },
+    });
+  };
+
   // ---- Quick --------------------------------------------------------------
   const playQuick = (player: string, opponent: string, level: number) => {
     const lvl = aiLevel(level);
@@ -402,7 +452,23 @@ export function App() {
       case 'collection':
         return <Collection save={save} onBack={menu} onHistory={(mage) => setScreen({ name: 'history', mage, from: 'collection' })} />;
       case 'pvp':
-        return <PvpComingSoon onBack={menu} />;
+        return (
+          <MultiplayerLobby
+            key={screen.autoQueue ? `auto-${Date.now()}` : 'lobby'}
+            save={save}
+            autoQueue={screen.autoQueue}
+            onBack={() => {
+              pvp.close();
+              menu();
+            }}
+            onSettings={(settings) => {
+              const s2 = { ...saveRef.current, settings };
+              writeSave(s2);
+              setSave(s2);
+            }}
+            onMatch={playOnline}
+          />
+        );
       case 'history':
         return (
           <MatchHistory save={save} initialMage={screen.mage} onBack={() => (screen.from === 'collection' ? setScreen({ name: 'collection' }) : menu())} />
@@ -440,7 +506,9 @@ export function App() {
             header={screen.header}
             spotlight={screen.spotlight}
             settings={save.settings}
-            firstBattle={!save.seenHowToPlay}
+            firstBattle={!save.seenHowToPlay && screen.mode !== 'pvp'}
+            makeController={screen.makeController}
+            opponentTag={screen.opponentName}
             onGuideSeen={() => {
               const s2 = { ...saveRef.current, seenHowToPlay: true };
               writeSave(s2);
@@ -449,9 +517,13 @@ export function App() {
             onEnd={(r) => {
               // Record first: the mode's own handler builds on the latest save.
               const kind = screen.mode === 'pvp' ? 'pvp' : 'bots';
-              const s2 = recordMatch(saveRef.current, screen.setup.player, kind, { won: r.won, durationMs: r.durationMs });
-              const rec = historyEntry(screen, r, r.won ? 'win' : 'loss');
-              setSave(unlockAchievements(addHistory(s2, rec), [rec]));
+              const cancelled = r.reason === 'server';
+              const draw = !r.won && r.state.winner === null && r.reason === 'timeout';
+              if (!cancelled) {
+                const s2 = draw ? saveRef.current : recordMatch(saveRef.current, screen.setup.player, kind, { won: r.won, durationMs: r.durationMs });
+                const rec = historyEntry(screen, r, r.won ? 'win' : draw ? 'draw' : 'loss');
+                setSave(unlockAchievements(addHistory(s2, rec), [rec]));
+              }
               screen.onEnd(r);
             }}
             onQuit={(r) => {

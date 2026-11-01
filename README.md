@@ -91,6 +91,37 @@ falls back to built-in vector gems, so new mages work before their art exists.
   picks, trims and levels them into `packages/client/public/assets/sfx/` and writes `manifest.json`. Any sound
   without a file (currently spell, ultimate, heal, freeze, poison, stun) is synthesized in code.
 
+## Online play (PVP)
+
+The PVP server lives in `packages/server` and runs the same engine as the game. It's authoritative:
+clients only send "swap these two gems", and the server validates every move, paces players and
+broadcasts results. Board RNG never leaves the server, so upcoming gems can't be predicted.
+
+**Run it locally:** `npm run server` (port 8787), then `npm run dev` or `npm run desktop`. Dev builds
+connect to `ws://localhost:8787`; release builds connect to the address in
+`packages/client/vite.config.ts` (`RELEASE_PVP_SERVER`). `npm run bots -w @magepop/server` runs two
+headless bots against it.
+
+**Deploy (Fly.io, one-time setup):**
+
+1. Create an account at fly.io and install `flyctl`.
+2. `fly launch --no-deploy --copy-config` from the repo root (keeps `fly.toml`). If the app name
+   `magepop-server` is taken, pick another and update both `app` in `fly.toml` and
+   `RELEASE_PVP_SERVER` in `packages/client/vite.config.ts`.
+3. `fly tokens create deploy` and add the token to GitHub: repo Settings, Secrets and variables,
+   Actions, new secret `FLY_API_TOKEN`.
+4. Push to `main` (or run the "Deploy server" workflow). It tests, then deploys. The server sleeps
+   when nobody's connected and wakes on the next connection, so it costs close to nothing idle.
+
+Matches live in memory, so the server must stay a single machine (`--ha=false` in the workflow).
+
+**Security notes** (this repo is public): all client input is size-capped, strictly parsed
+(`parseClientMessage` in `packages/core/src/protocol.ts`) and rate limited; connections are capped
+globally and per IP; names are sanitized; matches have a time limit; resume tokens are random
+secrets sent only to their owner. `npm test` includes hostile-client tests for all of this. The
+desktop app runs sandboxed with a strict Content Security Policy and can't navigate or open windows.
+No secrets belong in this repo: deployment credentials live in GitHub secrets.
+
 ## Building and releasing
 
 **Build installers locally** (for the OS you're on):

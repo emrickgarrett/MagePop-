@@ -637,24 +637,3 @@ export function ResultScreen({ info }: { info: ResultInfo }) {
   );
 }
 
-export function PvpComingSoon({ onBack }: { onBack: () => void }) {
-  const modes = [
-    { name: 'Quick Match', desc: 'Get paired with a random opponent online.' },
-    { name: 'Ranked', desc: 'Climb the ladder. Wins and losses move your rating.' },
-    { name: 'Friend Battle', desc: 'Share a room code and duel a friend.' },
-  ];
-  return (
-    <ScreenFrame title="Multiplayer" onBack={onBack}>
-      <div className="mp-modes">
-        {modes.map((m) => (
-          <div key={m.name} className="mp-card">
-            <span className="mp-soon">Coming soon</span>
-            <h3>{m.name}</h3>
-            <p className="muted">{m.desc}</p>
-          </div>
-        ))}
-      </div>
-      <p className="muted mp-foot">Online battles are on the way. Until then, sharpen your skills against the bots in Story, Quick Battle and Endless.</p>
-    </ScreenFrame>
-  );
-}

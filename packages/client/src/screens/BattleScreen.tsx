@@ -5,6 +5,7 @@ import { CalloutStage, PlayerPanel, SpellLegend } from '../components/Hud';
 import { SpellFxLayer } from '../components/SpellFx';
 import { HowToPlay } from '../components/HowToPlay';
 import { BattleController, BattleResult, BattleSetup } from '../game/BattleController';
+import { NetBattleController } from '../game/pvp';
 import type { Settings } from '../game/save';
 import { themedBoardSrc } from '../game/themes';
 import { audio } from '../game/audio';
@@ -45,6 +46,8 @@ export function BattleScreen({
   settings,
   firstBattle,
   onGuideSeen,
+  makeController,
+  opponentTag,
   onEnd,
   onQuit,
 }: {
@@ -55,13 +58,23 @@ export function BattleScreen({
   /** Show the How to Play guide before the countdown. */
   firstBattle?: boolean;
   onGuideSeen?: () => void;
+  /** Supply a different controller (online matches). Default: a local battle vs a bot. */
+  makeController?: (onEnd: (r: BattleResult) => void) => BattleController;
+  /** Label on the opponent's panel (default: bot difficulty). */
+  opponentTag?: string;
   onEnd: (r: BattleResult) => void;
   /** Forfeit from the pause menu (counts as a loss). */
   onQuit: (r: BattleResult) => void;
 }) {
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
-  const ctrl = useMemo(() => new BattleController(setup, (r) => onEndRef.current(r)), [setup]);
+  const ctrl = useMemo(
+    () => (makeController ? makeController((r) => onEndRef.current(r)) : new BattleController(setup, (r) => onEndRef.current(r))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [setup],
+  );
+  const online = ctrl instanceof NetBattleController;
+  useEffect(() => () => (ctrl instanceof NetBattleController ? ctrl.dispose() : undefined), [ctrl]);
   const [, setFrame] = useState(0);
   const [paused, setPaused] = useState(false);
   const [countdown, setCountdown] = useState(true);
@@ -97,7 +110,7 @@ export function BattleScreen({
     const t = setTimeout(() => {
       setCountdown(false);
       ctrl.paused = false;
-    }, COUNTDOWN_MS);
+    }, ctrl.countdownMs ?? COUNTDOWN_MS);
     return () => clearTimeout(t);
   }, [ctrl, guideOpenAtStart]);
 
@@ -143,7 +156,7 @@ export function BattleScreen({
     <div className="battle-screen" ref={rootRef}>
       <div className="battle-top">
         <div className="battle-header">{header}</div>
-        <div className="battle-hint">{settings.battleHints ? 'Drag or click gems to swap · Esc to pause' : ''}</div>
+        <div className="battle-hint">{settings.battleHints ? `Drag or click gems to swap · Esc for ${online ? 'menu' : 'pause'}` : ''}</div>
         <button
           className="btn small ghost"
           onClick={() => {
@@ -151,9 +164,15 @@ export function BattleScreen({
             setPaused(true);
           }}
         >
-          Pause
+          {online ? 'Menu' : 'Pause'}
         </button>
       </div>
+      {online && ctrl.reconnecting && <div className="net-banner">Connection lost. Reconnecting…</div>}
+      {online && !ctrl.reconnecting && ctrl.opponentGraceUntil !== null && (
+        <div className="net-banner soft">
+          {ctrl.opponent.name} disconnected. They have {Math.max(0, Math.ceil((ctrl.opponentGraceUntil - performance.now()) / 1000))}s to come back.
+        </div>
+      )}
       <div className="arena">
         <div className="arena-side me">
           <PlayerPanel {...me} fx={[]} time={s.time} side={0} tag="YOU" />
@@ -178,7 +197,7 @@ export function BattleScreen({
         </div>
         <div className="vs">VS</div>
         <div className="arena-side foe">
-          <PlayerPanel {...foe} time={s.time} side={1} tag={setup.aiLevel.name.toUpperCase()} />
+          <PlayerPanel {...foe} time={s.time} side={1} tag={(opponentTag ?? setup.aiLevel.name).toUpperCase()} />
           <div ref={foeBoard} className="board-wrap themed" style={boardStyle(foe.ch.id, foe.ch.palette.primary)}>
             <BoardView theme={foe.ch.id} frame={ctrl.display[1].frame} engineTime={s.time} cell={cells.small} interactive={false} stunned={foe.stunned} label="Opponent board" />
           </div>
@@ -207,7 +226,8 @@ export function BattleScreen({
       {paused && (
         <div className="overlay">
           <div className="modal">
-            <h2>Paused</h2>
+            <h2>{online ? 'Menu' : 'Paused'}</h2>
+            {online && <p className="muted">The match is still going!</p>}
             <button
               className="btn"
               onClick={() => {
@@ -215,12 +235,18 @@ export function BattleScreen({
                 setPaused(false);
               }}
             >
-              Resume
+              {online ? 'Back to the fight' : 'Resume'}
             </button>
             <button className="btn ghost" onClick={() => setGuide('pause')}>
               How to play
             </button>
-            <button className="btn ghost" onClick={() => onQuit(ctrl.snapshot())}>
+            <button
+              className="btn ghost"
+              onClick={() => {
+                if (ctrl instanceof NetBattleController) ctrl.forfeit();
+                onQuit(ctrl.snapshot());
+              }}
+            >
               Forfeit &amp; quit
             </button>
           </div>

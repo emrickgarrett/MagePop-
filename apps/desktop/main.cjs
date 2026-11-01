@@ -9,6 +9,9 @@ function clientIndex() {
   return path.join(__dirname, '..', '..', 'packages', 'client', 'dist', 'index.html');
 }
 
+// Only honored for local development (unpackaged): a release build always loads its own files.
+const devUrl = !app.isPackaged && /^http:\/\/localhost:\d+\/?$/.test(process.env.MAGEPOP_DEV_URL || '') ? process.env.MAGEPOP_DEV_URL : null;
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -21,11 +24,18 @@ function createWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
+      // Security: the page never gets Node access; the preload exposes only a few safe calls.
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   });
-  const devUrl = process.env.MAGEPOP_DEV_URL;
+  // The game is a single local page: never navigate away or open new windows from it.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e, url) => {
+    if (!devUrl || !url.startsWith(devUrl)) e.preventDefault();
+  });
   if (devUrl) win.loadURL(devUrl);
   else win.loadFile(clientIndex());
   win.webContents.on('before-input-event', (_e, input) => {

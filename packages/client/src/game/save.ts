@@ -11,6 +11,10 @@ export interface Settings {
   skipReplayDialogue: boolean;
   /** Show the controls hint line during battles. */
   battleHints: boolean;
+  /** Display name for online matches ('' = not chosen yet). */
+  playerName: string;
+  /** Last mage picked for online matches. */
+  pvpMage: string | null;
   /** 0..1 */
   musicVolume: number;
   /** 0..1 */
@@ -43,10 +47,12 @@ export interface MatchRecord {
   detail: string;
   player: string;
   opponent: string;
+  /** Online: the opponent's display name. */
+  opponentName?: string;
   /** Bot difficulty name and id (absent online). */
   level?: string;
   levelId?: string;
-  result: 'win' | 'loss' | 'forfeit';
+  result: 'win' | 'loss' | 'forfeit' | 'draw';
   durationMs: number;
   damageDealt: number;
   damageTaken: number;
@@ -101,6 +107,8 @@ export const DEFAULT_SETTINGS: Settings = {
   combatText: true,
   skipReplayDialogue: false,
   battleHints: true,
+  playerName: '',
+  pvpMage: null,
   musicVolume: 0.6,
   sfxVolume: 0.8,
 };

@@ -1,0 +1,12 @@
+# Only core + server (and workspace manifests) are needed to build the server image.
+.git
+**/node_modules
+**/dist
+**/release
+art
+apps/desktop/build
+packages/client/src
+packages/client/public
+packages/client/test
+tools
+*.md

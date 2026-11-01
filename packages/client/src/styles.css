@@ -2620,3 +2620,117 @@ small {
   font-weight: 800;
   line-height: 1.02;
 }
+
+/* ---- Multiplayer lobby ---- */
+.mp-lobby {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+  width: min(1050px, 100%);
+  margin: 0 auto;
+  align-items: start;
+}
+.mp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 26px;
+  border-radius: 24px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+}
+.mp-panel h3 {
+  font-size: 28px;
+  margin: 0;
+}
+.mp-panel p {
+  margin: 0;
+}
+.mp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mp-field > span {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.mp-field input {
+  font: inherit;
+  font-size: 18px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ink);
+}
+.mp-mages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.char-card.small {
+  padding: 8px 10px;
+  min-width: 84px;
+}
+.mp-search {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.mp-search > div:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.mp-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.mp-error {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 90, 110, 0.14);
+  color: #ff9aaa;
+}
+.mp-modes.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.net-banner {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 8px 18px;
+  border-radius: 99px;
+  background: rgba(255, 90, 110, 0.9);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.net-banner.soft {
+  background: rgba(20, 8, 45, 0.92);
+  border: 1px solid rgba(255, 210, 94, 0.6);
+}
+.result-pill.draw {
+  background: rgba(255, 210, 94, 0.15);
+  color: #ffd36b;
+}

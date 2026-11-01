@@ -1,0 +1,36 @@
+# Fly.io config for the MagePop PVP server. Deployed by .github/workflows/deploy-server.yml.
+# Matches live in memory, so this must stay a single machine (deploys use --ha=false).
+app = "magepop-server"
+primary_region = "iad"
+
+[build]
+  dockerfile = "packages/server/Dockerfile"
+
+[env]
+  PORT = "8787"
+  # Fly's proxy sets this to the real client IP (used for per-IP connection limits).
+  TRUSTED_IP_HEADER = "fly-client-ip"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # Sleeps when nobody is connected and wakes on the next connection (keeps costs near zero).
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 1500
+    hard_limit = 2000
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

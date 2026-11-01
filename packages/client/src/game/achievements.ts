@@ -16,7 +16,7 @@ import type { MatchRecord, SaveData } from './save';
  */
 
 export type AchievementTier = 'bronze' | 'silver' | 'gold';
-export type AchievementCategory = 'journey' | 'combat' | 'mastery' | 'mages' | 'endless' | 'lifetime' | 'secret';
+export type AchievementCategory = 'journey' | 'combat' | 'mastery' | 'mages' | 'online' | 'endless' | 'lifetime' | 'secret';
 
 export interface AchievementDef {
   id: string;
@@ -45,6 +45,7 @@ export const CATEGORY_LABEL: Record<AchievementCategory, string> = {
   combat: 'Combat',
   mastery: 'Mastery',
   mages: 'Mages',
+  online: 'Online',
   endless: 'Endless',
   lifetime: 'Lifetime',
   secret: 'Secret',
@@ -308,6 +309,35 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     match: (m) => won(m) && m.player === m.opponent,
   },
   ...mageAchievements,
+
+  // ---- Online -----------------------------------------------------------------
+  {
+    id: 'online-debut',
+    name: 'Online Debut',
+    description: 'Win an online match.',
+    category: 'online',
+    tier: 'bronze',
+    icon: '🌐',
+    match: (m) => won(m) && m.mode === 'pvp',
+  },
+  {
+    id: 'online-10',
+    name: 'Duelist',
+    description: 'Win 10 online matches.',
+    category: 'online',
+    tier: 'silver',
+    icon: '⚔',
+    progress: (s) => [Object.values(s.mageStats).reduce((t, st) => t + (st.pvp?.wins ?? 0), 0), 10],
+  },
+  {
+    id: 'online-50',
+    name: 'Champion of the Arena',
+    description: 'Win 50 online matches.',
+    category: 'online',
+    tier: 'gold',
+    icon: '👑',
+    progress: (s) => [Object.values(s.mageStats).reduce((t, st) => t + (st.pvp?.wins ?? 0), 0), 50],
+  },
 
   // ---- Endless -----------------------------------------------------------------
   {

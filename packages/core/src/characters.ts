@@ -171,11 +171,15 @@ export const CHARACTERS: CharacterDef[] = [
   },
 ];
 
-export const CHARACTER_BY_ID: Record<string, CharacterDef> = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]));
+/** Null-prototype lookup, so inherited keys like "constructor" or "__proto__" are never mages. */
+export const CHARACTER_BY_ID: Record<string, CharacterDef> = Object.assign(
+  Object.create(null) as Record<string, CharacterDef>,
+  Object.fromEntries(CHARACTERS.map((c) => [c.id, c])),
+);
 
 export function getCharacter(id: string): CharacterDef {
-  const c = CHARACTER_BY_ID[id];
-  if (!c) throw new Error(`Unknown character ${id}`);
+  const c = Object.prototype.hasOwnProperty.call(CHARACTER_BY_ID, id) ? CHARACTER_BY_ID[id] : undefined;
+  if (!c) throw new Error(`Unknown character ${String(id).slice(0, 32)}`);
   return c;
 }
 
