@@ -1,5 +1,5 @@
 import { CharacterDef, describeSpell, GEM_COLORS, GemColor, PlayerState } from '@magepop/core';
-import { useState } from 'react';
+import { forwardRef, useState } from 'react';
 import type { FloatFx } from '../game/BattleController';
 import { Gem } from './Gem';
 
@@ -98,21 +98,22 @@ export function PlayerPanel({
 }
 
 /**
- * Your own callouts ("Fireball!", "-11", "Burn") in a compact row under your board, so nothing
- * floats over the gems you're playing. Ultimates are left out: the ultimate strip shows those.
+ * Your own callouts ("Fireball!", "-11", "Burn") at full size in the open area under the
+ * opponent's spell list, so nothing floats over the gems you're playing. Ultimates get the
+ * full banner here instead (drawn by SpellFxLayer), so their text is skipped.
  */
-export function BelowBoardFx({ fx }: { fx: FloatFx[] }) {
-  const shown = fx.filter((f) => f.kind !== 'ultimate').slice(-4);
+export const CalloutStage = forwardRef<HTMLDivElement, { fx: FloatFx[] }>(function CalloutStage({ fx }, ref) {
+  const shown = fx.filter((f) => f.kind !== 'ultimate');
   return (
-    <div className="fx-below">
-      {shown.map((f) => (
-        <div key={f.id} className={`float-mini float-${f.kind}`} style={{ color: f.kind === 'spell' ? f.color : undefined }}>
+    <div className="callout-stage" ref={ref}>
+      {shown.map((f, i) => (
+        <div key={f.id} className={`float float-${f.kind}`} style={{ color: f.kind === 'spell' ? f.color : undefined, top: `${30 + (i % 4) * 40}px` }}>
           {f.text}
         </div>
       ))}
     </div>
   );
-}
+});
 
 export function SpellLegend({ ch, spotlight = [], compact = false }: { ch: CharacterDef; spotlight?: GemColor[]; compact?: boolean }) {
   const [hover, setHover] = useState<GemColor | null>(null);

@@ -80,11 +80,14 @@ export function SpellFxLayer({
   now,
   boards,
   root,
+  stage,
 }: {
   vfx: Vfx[];
   now: number;
   boards: [RefObject<HTMLDivElement | null>, RefObject<HTMLDivElement | null>];
   root: RefObject<HTMLDivElement | null>;
+  /** Where your own ultimate banner plays (the open area on the right), so it never covers your board. */
+  stage?: RefObject<HTMLDivElement | null>;
 }) {
   if (!vfx.length || !root.current) return <div className="spellfx-layer" />;
   const base = root.current.getBoundingClientRect();
@@ -95,6 +98,12 @@ export function SpellFxLayer({
     return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
   };
   const rects: [Rect | null, Rect | null] = [rectOf(0), rectOf(1)];
+  const stageRect = (() => {
+    const el = stage?.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return r.height > 60 ? { x: r.left - base.left, y: r.top - base.top, w: r.width, h: Math.min(r.height, 220) } : null;
+  })();
 
   return (
     <div className="spellfx-layer">
@@ -107,7 +116,11 @@ export function SpellFxLayer({
           return from ? <Projectile key={v.id} v={v} t={t} from={from} to={target} /> : null;
         }
         if (v.kind === 'impact') return <Impact key={v.id} v={v} t={t} r={target} />;
-        if (v.kind === 'ultimate') return <UltimateBanner key={v.id} v={v} t={t} r={target} />;
+        if (v.kind === 'ultimate') {
+          // Yours plays full size on the callout stage; theirs over their board.
+          const area = v.side === 0 && stageRect ? stageRect : target;
+          return <UltimateBanner key={v.id} v={v} t={t} r={area} onStage={area === stageRect} />;
+        }
         return <BoardAura key={v.id} v={v} t={t} r={target} />;
       })}
     </div>
@@ -527,12 +540,12 @@ function stunStyle(
 
 // ---- ultimate banner ---------------------------------------------------------------
 
-function UltimateBanner({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
+function UltimateBanner({ v, t, r, onStage = false }: { v: Vfx; t: number; r: Rect; onStage?: boolean }) {
   const ch = v.theme ? getCharacter(v.theme) : null;
   // Slide in fast, hold, slide out.
   const x = t < 0.18 ? -1 + easeOut(t / 0.18) : t > 0.8 ? easeOut((t - 0.8) / 0.2) : 0;
-  if (v.side === 0) {
-    // Your own ultimate: a compact strip just under your board, so it never covers the gems you're playing.
+  if (v.side === 0 && !onStage) {
+    // Fallback when there's no stage (very short windows): a compact strip just under your board, so it never covers the gems you're playing.
     const w = Math.min(r.w * 0.78, 420);
     const h = 54;
     const pop = t < 0.15 ? easeOut(t / 0.15) : t > 0.82 ? 1 - easeOut((t - 0.82) / 0.18) : 1;
@@ -560,7 +573,7 @@ function UltimateBanner({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
   const flash = clamp01(1 - t / 0.25);
   return (
     <div className="fx-aura" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}>
-      <div className="fx-tint" style={{ background: v.color, opacity: flash * 0.45 }} />
+      {!onStage && <div className="fx-tint" style={{ background: v.color, opacity: flash * 0.45 }} />}
       <div className="fx-ult-band" style={{ transform: `translateX(${x * 110}%) skewY(-6deg)`, '--c': v.color } as CSSProperties}>
         {ch && <img src={`assets/portraits/${ch.id}.png`} alt="" className="fx-ult-portrait" onError={(e) => (e.currentTarget.style.display = 'none')} />}
         <div className="fx-ult-text">

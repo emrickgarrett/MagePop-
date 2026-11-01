@@ -1,7 +1,7 @@
 import { getCharacter, GemColor, PlayerIndex, Pos, validMoves } from '@magepop/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BoardView } from '../components/BoardView';
-import { BelowBoardFx, PlayerPanel, SpellLegend } from '../components/Hud';
+import { CalloutStage, PlayerPanel, SpellLegend } from '../components/Hud';
 import { SpellFxLayer } from '../components/SpellFx';
 import { HowToPlay } from '../components/HowToPlay';
 import { BattleController, BattleResult, BattleSetup } from '../game/BattleController';
@@ -73,6 +73,7 @@ export function BattleScreen({
   const rootRef = useRef<HTMLDivElement>(null);
   const myBoard = useRef<HTMLDivElement>(null);
   const foeBoard = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Dev-only hook for automated play-testing.
@@ -172,7 +173,6 @@ export function BattleScreen({
               stunned={me.stunned}
               label="Your board"
             />
-            <BelowBoardFx fx={me.fx} />
           </div>
           <SpellLegend ch={me.ch} spotlight={spotlight} />
         </div>
@@ -183,10 +183,12 @@ export function BattleScreen({
             <BoardView theme={foe.ch.id} frame={ctrl.display[1].frame} engineTime={s.time} cell={cells.small} interactive={false} stunned={foe.stunned} label="Opponent board" />
           </div>
           <SpellLegend ch={foe.ch} compact />
+          {/* Your spell callouts play out here, in the open space, so your own board stays clear. */}
+          <CalloutStage ref={stageRef} fx={me.fx} />
         </div>
       </div>
 
-      <SpellFxLayer vfx={settings.spellEffects ? ctrl.vfx : []} now={ctrl.now} boards={[myBoard, foeBoard]} root={rootRef} />
+      <SpellFxLayer vfx={settings.spellEffects ? ctrl.vfx : []} now={ctrl.now} boards={[myBoard, foeBoard]} root={rootRef} stage={stageRef} />
 
       {guide && (
         <HowToPlay
