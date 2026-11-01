@@ -26,7 +26,7 @@ OUT_BOARDS = ROOT / "packages" / "client" / "public" / "assets" / "boards"
 # Grid order of each sheet: top row L->R, then bottom row L->R (6th cell empty).
 SOURCES = {
     "ember": {
-        "sheet": "Match-3_puzzle_gem_icon_sprite_sheet_for_fire_mage_6102fc00-a8e0-49c7-916b-ba8a03c06f3d.jpg",
+        "sheet": "ONE_sprite_sheet_with_five_match-3_puzzle_gem_icon_6b48aa50-7d04-4c97-b3a7-3568bf28c142.jpg",
         "order": ["ruby", "topaz", "amethyst", "sapphire", "emerald"],
         "board": "Dark_charred_obsidian_stone_floor_with_faint_glowi_9694ed1e-6fec-4bc3-acd1-cc4360e2fcf0.jpg",
     },
