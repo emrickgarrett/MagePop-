@@ -1,4 +1,4 @@
-import { CHARACTERS, getCharacter, LIMITS, sanitizeName, ServerMessage } from '@magepop/core';
+import { CHARACTERS, getCharacter, LIMITS, normalizeRoomCode, ROOM_CODE_LENGTH, sanitizeName, ServerMessage } from '@magepop/core';
 import { useEffect, useRef, useState } from 'react';
 import { Portrait } from '../components/Hud';
 import { pvp } from '../game/pvp';
@@ -7,9 +7,11 @@ import { ScreenFrame } from './Menus';
 
 type MatchFound = Extract<ServerMessage, { t: 'matchFound' }>;
 
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
+
 /**
- * Online lobby: pick a name and a mage, then Quick Match. The connection stays open between
- * matches so "Rematch" can queue straight away.
+ * Online lobby: pick a name and a mage, then either Quick Match (random opponent) or a Friend
+ * Battle (host a room code, or join a friend's). The connection stays open between matches.
  */
 export function MultiplayerLobby({
   save,
@@ -19,7 +21,7 @@ export function MultiplayerLobby({
   onMatch,
 }: {
   save: SaveData;
-  /** Queue immediately (coming back from "Rematch"). */
+  /** Queue immediately (coming back from "Rematch" after a Quick Match). */
   autoQueue?: boolean;
   onBack: () => void;
   onSettings: (s: Settings) => void;
@@ -29,6 +31,8 @@ export function MultiplayerLobby({
   const [mage, setMage] = useState(
     save.settings.pvpMage && save.unlocked.includes(save.settings.pvpMage) ? save.settings.pvpMage : save.unlocked[0],
   );
+  const [code, setCode] = useState('');
+  const [copied, setCopied] = useState(false);
   const [, bump] = useState(0);
   const [searchStart, setSearchStart] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -49,67 +53,93 @@ export function MultiplayerLobby({
   }, []);
 
   const cleanName = sanitizeName(name);
-  const searching = pvp.status === 'queued' || pvp.status === 'connecting';
+  const status = pvp.status;
+  const searching = status === 'queued' || (status === 'connecting' && searchStart !== null);
+  const hosting = status === 'hosting';
+  const busy = searching || hosting || status === 'connecting';
 
-  const find = async () => {
+  /** Save the name and mage, connect if needed. False if the server can't be reached. */
+  const ready = async () => {
     onSettings({ ...save.settings, playerName: cleanName, pvpMage: mage });
-    setSearchStart(Date.now());
     try {
       await pvp.connect(cleanName);
-      pvp.queue(mage);
+      return true;
     } catch {
-      setSearchStart(null);
+      return false;
     }
   };
 
-  const cancel = () => {
+  const findMatch = async () => {
+    setSearchStart(Date.now());
+    if (await ready()) pvp.queue(mage);
+    else setSearchStart(null);
+  };
+  const cancelSearch = () => {
     pvp.cancelQueue();
     setSearchStart(null);
   };
+  const createRoom = async () => {
+    setCopied(false);
+    if (await ready()) pvp.createRoom(mage);
+  };
+  const joinRoom = async () => {
+    const c = normalizeRoomCode(code);
+    if (!c) return;
+    if (await ready()) pvp.joinRoom(c, mage);
+  };
+  const copyCode = async () => {
+    if (!pvp.roomCode) return;
+    try {
+      await navigator.clipboard.writeText(pvp.roomCode);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
 
-  // "Rematch" from the result screen lands here and searches again right away.
+  // "Rematch" after a Quick Match lands here and searches again right away.
   const auto = useRef(autoQueue);
   useEffect(() => {
     if (auto.current) {
       auto.current = false;
-      void find();
+      void findMatch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const leave = () => {
-    if (searching) cancel();
+    if (searching) cancelSearch();
+    if (hosting) pvp.closeRoom();
     onBack();
   };
 
-  const waited = searchStart ? Math.floor((now - searchStart) / 1000) : 0;
   const ch = getCharacter(mage);
+  const waited = searchStart ? Math.floor((now - searchStart) / 1000) : 0;
+  const roomLeft = Math.ceil((pvp.roomExpiresAt - now) / 1000);
+  const codeOk = normalizeRoomCode(code) !== null;
 
   return (
     <ScreenFrame title="Multiplayer" onBack={leave}>
-      <div className="mp-lobby">
+      <div className="mp-lobby" style={{ '--accent': ch.palette.primary } as React.CSSProperties}>
         <div className="mp-panel">
-          <h3>Quick Match</h3>
-          <p className="muted">Get paired with another mage online. Your stats, history and achievements count online wins too.</p>
-
+          <h3>You</h3>
           <label className="mp-field">
             <span>Your name</span>
             <input
               value={name}
               maxLength={LIMITS.nameMax}
               placeholder="Mage"
-              disabled={searching}
+              disabled={busy}
               onChange={(e) => setName(e.target.value)}
               spellCheck={false}
               autoComplete="off"
             />
           </label>
-
           <div className="mp-field">
             <span>Your mage</span>
             <div className="mp-mages">
               {CHARACTERS.filter((c) => save.unlocked.includes(c.id)).map((c) => (
-                <button key={c.id} className={`char-card small ${mage === c.id ? 'picked' : ''}`} disabled={searching} onClick={() => setMage(c.id)}>
+                <button key={c.id} className={`char-card small ${mage === c.id ? 'picked' : ''}`} disabled={busy} onClick={() => setMage(c.id)}>
                   <Portrait ch={c} size={56} />
                   <span>{c.name}</span>
                 </button>
@@ -117,42 +147,120 @@ export function MultiplayerLobby({
             </div>
             {save.unlocked.length < CHARACTERS.length && <small className="muted">Recruit more mages in Story mode.</small>}
           </div>
-
-          {searching ? (
-            <div className="mp-search" style={{ '--accent': ch.palette.primary } as React.CSSProperties}>
-              <div className="mp-spinner" />
-              <div>
-                <b>{pvp.status === 'connecting' ? 'Connecting…' : 'Searching for an opponent…'}</b>
-                <small className="muted">
-                  {Math.floor(waited / 60)}:{String(waited % 60).padStart(2, '0')}
-                </small>
-              </div>
-              <button className="btn small ghost" onClick={cancel}>
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button className="btn big" onClick={find}>
-              Find Match
-              <small>as {ch.name}</small>
-            </button>
-          )}
-          {pvp.error && !searching && <div className="mp-error">{pvp.error}</div>}
+          <p className="muted small-print">Online wins count toward your stats, history and achievements.</p>
         </div>
 
-        <div className="mp-modes side">
-          {[
-            { name: 'Ranked', desc: 'Climb the ladder. Wins and losses move your rating.' },
-            { name: 'Friend Battle', desc: 'Share a room code and duel a friend.' },
-          ].map((m) => (
-            <div key={m.name} className="mp-card">
-              <span className="mp-soon">Coming soon</span>
-              <h3>{m.name}</h3>
-              <p className="muted">{m.desc}</p>
-            </div>
-          ))}
+        <div className="mp-col">
+          <div className="mp-panel">
+            <h3>Quick Match</h3>
+            <p className="muted">Get paired with a random mage online.</p>
+            {searching ? (
+              <div className="mp-search">
+                <div className="mp-spinner" />
+                <div>
+                  <b>{status === 'connecting' ? 'Connecting…' : 'Searching for an opponent…'}</b>
+                  <small className="muted">{mmss(waited)}</small>
+                </div>
+                <button className="btn small ghost" onClick={cancelSearch}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button className="btn big" disabled={busy} onClick={findMatch}>
+                Find Match
+                <small>as {ch.name}</small>
+              </button>
+            )}
+          </div>
+
+          <div className="mp-panel">
+            <h3>Friend Battle</h3>
+            {hosting && pvp.roomCode ? (
+              <>
+                <p className="muted">Send this code to your friend. The match starts as soon as they join.</p>
+                <div className="room-code">
+                  {pvp.roomCode.split('').map((ch, i) => (
+                    <span key={i}>{ch}</span>
+                  ))}
+                </div>
+                <div className="mp-search">
+                  <div className="mp-spinner" />
+                  <div>
+                    <b>Waiting for your friend…</b>
+                    <small className="muted">Code expires in {mmss(roomLeft)}</small>
+                  </div>
+                  <button className="btn small ghost" onClick={copyCode}>
+                    {copied ? 'Copied!' : 'Copy code'}
+                  </button>
+                  <button className="btn small ghost" onClick={() => pvp.closeRoom()}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="muted">Play someone you know: make a room and share the code, or enter theirs.</p>
+                <div className="friend-row">
+                  <button className="btn" disabled={busy} onClick={createRoom}>
+                    Create room
+                  </button>
+                  <span className="muted">or</span>
+                  <input
+                    className="code-input"
+                    value={code}
+                    maxLength={ROOM_CODE_LENGTH + 2}
+                    placeholder="CODE"
+                    disabled={busy}
+                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === 'Enter' && codeOk && joinRoom()}
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-label="Friend's room code"
+                  />
+                  <button className="btn" disabled={busy || !codeOk} onClick={joinRoom}>
+                    Join
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {pvp.error && !busy && <div className="mp-error">{pvp.error}</div>}
+
+          <div className="mp-card slim">
+            <span className="mp-soon">Coming soon</span>
+            <h3>Ranked</h3>
+            <p className="muted">Climb the ladder. Wins and losses move your rating.</p>
+          </div>
         </div>
       </div>
     </ScreenFrame>
   );
+}
+
+/**
+ * Rematch controls on the result screen after a friend battle. Starts the next match as soon as
+ * both players have asked.
+ */
+export function FriendRematch({ friend, onMatch }: { friend: string; onMatch: (found: MatchFound) => void }) {
+  type S = 'available' | 'waiting' | 'opponentWants' | 'cancelled' | 'pending';
+  const [state, setState] = useState<S>(pvp.rematchStatus ?? 'pending');
+  const onMatchRef = useRef(onMatch);
+  onMatchRef.current = onMatch;
+  useEffect(() => {
+    const off = pvp.on((m) => {
+      if (m.t === 'rematch') setState(m.status);
+      if (m.t === 'matchFound') onMatchRef.current(m);
+    });
+    return () => void off();
+  }, []);
+  const text: Record<S, string> = {
+    pending: '',
+    available: `Press Rematch to play ${friend} again.`,
+    waiting: `Waiting for ${friend}…`,
+    opponentWants: `${friend} wants a rematch!`,
+    cancelled: `${friend} left, so no rematch this time.`,
+  };
+  if (!text[state]) return null;
+  return <div className={`rematch-note ${state}`}>{text[state]}</div>;
 }

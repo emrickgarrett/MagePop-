@@ -105,7 +105,7 @@ function HistoryRow({ m }: { m: MatchRecord }) {
         </b>
         <small>
           {MODE_LABEL[m.mode]}
-          {m.mode !== 'quick' && m.mode !== 'pvp' && ` · ${m.detail}`}
+          {m.mode !== 'quick' && (m.mode !== 'pvp' || m.detail === 'Friend battle') && ` · ${m.detail}`}
           {m.level && ` · ${m.level}`}
         </small>
       </div>

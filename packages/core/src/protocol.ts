@@ -30,7 +30,14 @@ export type ClientMessage =
   | { t: 'forfeit' }
   | { t: 'ping'; at: number }
   /** Rejoin a match after a dropped connection. */
-  | { t: 'resume'; token: string };
+  | { t: 'resume'; token: string }
+  /** Friend battles: host a room, or join one by code. */
+  | { t: 'createRoom'; characterId: string }
+  | { t: 'joinRoom'; code: string; characterId: string }
+  | { t: 'closeRoom' }
+  /** After a friend battle: ask for (or turn down) another round with the same friend. */
+  | { t: 'rematch' }
+  | { t: 'declineRematch' };
 
 export interface OpponentInfo {
   name: string;
@@ -39,7 +46,33 @@ export interface OpponentInfo {
 
 export type MatchEndReason = 'ko' | 'forfeit' | 'disconnect' | 'timeout' | 'server';
 
-export type ErrorCode = 'version' | 'badMessage' | 'rateLimited' | 'notReady' | 'unknownCharacter' | 'busy' | 'full' | 'resumeFailed';
+export type ErrorCode =
+  | 'version'
+  | 'badMessage'
+  | 'rateLimited'
+  | 'notReady'
+  | 'unknownCharacter'
+  | 'busy'
+  | 'full'
+  | 'resumeFailed'
+  | 'roomNotFound'
+  | 'tooManyAttempts';
+
+/**
+ * Friend room codes: 6 characters from an alphabet without look-alikes (no 0/O, 1/I/L, etc.).
+ * 31^6 is about 887 million codes; with join attempts rate limited, guessing a live one is hopeless.
+ */
+export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export const ROOM_CODE_LENGTH = 6;
+
+/** Uppercase, drop spaces/dashes people might type. Returns null if it can't be a valid code. */
+export function normalizeRoomCode(raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.length > 20) return null;
+  const code = raw.toUpperCase().replace(/[\s-]/g, '');
+  if (code.length !== ROOM_CODE_LENGTH) return null;
+  for (const ch of code) if (!ROOM_CODE_ALPHABET.includes(ch)) return null;
+  return code;
+}
 
 export type ServerMessage =
   | { t: 'welcome' }
@@ -53,7 +86,16 @@ export type ServerMessage =
       startsInMs: number;
       /** Secret for rejoining this match after a disconnect. Only ever sent to its owner. */
       resumeToken: string;
+      /** A friend battle (from a room code or a rematch) rather than a Quick Match. */
+      friendly?: boolean;
     }
+  | { t: 'roomCreated'; code: string; expiresInMs: number }
+  | { t: 'roomClosed'; reason: 'expired' | 'cancelled' }
+  /**
+   * Friend rematch status: 'available' when a friend battle ends (both still here), 'opponentWants'
+   * when they've asked, 'cancelled' when they left or said no.
+   */
+  | { t: 'rematch'; status: 'available' | 'opponentWants' | 'waiting' | 'cancelled' }
   | { t: 'resumed'; you: PlayerIndex; opponent: OpponentInfo; state: BattleState; startsInMs: number }
   /**
    * Engine events, already applied on the server. `time` is server battle time (for clock sync).
@@ -125,6 +167,16 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return typeof m.at === 'number' && Number.isFinite(m.at) ? { t: 'ping', at: m.at } : null;
     case 'resume':
       return typeof m.token === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(m.token) ? { t: 'resume', token: m.token } : null;
+    case 'createRoom':
+      return isCharacterId(m.characterId) ? { t: 'createRoom', characterId: m.characterId } : null;
+    case 'joinRoom': {
+      const code = normalizeRoomCode(m.code);
+      return code && isCharacterId(m.characterId) ? { t: 'joinRoom', code, characterId: m.characterId } : null;
+    }
+    case 'closeRoom':
+    case 'rematch':
+    case 'declineRematch':
+      return { t: m.t };
     default:
       return null;
   }

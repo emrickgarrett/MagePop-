@@ -13,7 +13,7 @@
  *    cross-site. Errors never include stack traces or internal details.
  *  - No secrets live in this repo; deployment config comes from environment variables.
  */
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { createServer, IncomingMessage, Server } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import {
@@ -29,6 +29,8 @@ import {
   parseClientMessage,
   PlayerIndex,
   PROTOCOL_VERSION,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
   publicEvents,
   publicPlayer,
   publicState,
@@ -54,6 +56,13 @@ export interface ServerOptions {
   /** Token bucket per connection. */
   rate: { burst: number; perSecond: number };
   maxQueue: number;
+  /** Friend rooms: how long a code stays valid, how many can exist. */
+  roomTtlMs: number;
+  maxRooms: number;
+  /** Room-code join attempts allowed per IP per minute (stops code guessing). */
+  joinAttemptsPerMinute: number;
+  /** How long both players have to agree to a friend rematch. */
+  rematchWindowMs: number;
   log: (msg: string) => void;
 }
 
@@ -68,6 +77,10 @@ export const DEFAULT_OPTIONS: ServerOptions = {
   heartbeatMs: 15_000,
   rate: { burst: 40, perSecond: 20 },
   maxQueue: 1000,
+  roomTtlMs: 10 * 60_000,
+  maxRooms: 5000,
+  joinAttemptsPerMinute: 10,
+  rematchWindowMs: 60_000,
   log: (m) => console.log(`${new Date().toISOString()} ${m}`),
 };
 
@@ -81,9 +94,26 @@ interface Conn {
   characterId?: string;
   match?: Match;
   seat?: PlayerIndex;
+  /** The friend room this player is hosting, if any. */
+  room?: Room;
+  /** A pending friend rematch, if any. */
+  rematch?: RematchOffer;
   alive: boolean;
   tokens: number;
   lastRefill: number;
+}
+
+interface Room {
+  code: string;
+  host: Conn;
+  characterId: string;
+  timer: NodeJS.Timeout;
+}
+
+interface RematchOffer {
+  players: [Conn, Conn];
+  wants: Set<Conn>;
+  timer: NodeJS.Timeout;
 }
 
 function send(c: Conn | null | undefined, m: ServerMessage) {
@@ -105,6 +135,8 @@ export class PvpServer {
   private matches = new Set<Match>();
   /** resume token -> match + seat */
   readonly resumeTokens = new Map<string, { match: Match; seat: PlayerIndex }>();
+  private rooms = new Map<string, Room>();
+  private joinAttempts = new Map<string, { count: number; resetAt: number }>();
   private heartbeat: NodeJS.Timeout;
 
   constructor(opts: Partial<ServerOptions> = {}) {
@@ -134,6 +166,9 @@ export class PvpServer {
   /** Graceful stop (deploys): tell everyone, end matches without a result, close. */
   async close(notice = 'The server is restarting. Please reconnect in a moment.') {
     clearInterval(this.heartbeat);
+    for (const room of this.rooms.values()) clearTimeout(room.timer);
+    this.rooms.clear();
+    for (const c of this.conns) this.cancelRematch(c);
     for (const m of [...this.matches]) m.end(null, 'server');
     for (const c of this.conns) {
       send(c, { t: 'notice', message: notice });
@@ -144,7 +179,7 @@ export class PvpServer {
   }
 
   get stats() {
-    return { connections: this.conns.size, queued: this.queue.length, matches: this.matches.size };
+    return { connections: this.conns.size, queued: this.queue.length, matches: this.matches.size, rooms: this.rooms.size };
   }
 
   // ---- connections ----------------------------------------------------------------------
@@ -196,6 +231,8 @@ export class PvpServer {
       if (n > 0) this.perIp.set(ip, n);
       else this.perIp.delete(ip);
       this.removeFromQueue(c);
+      this.closeRoom(c, false);
+      this.cancelRematch(c);
       c.match?.disconnected(c);
     });
     ws.on('error', () => ws.terminate());
@@ -236,6 +273,8 @@ export class PvpServer {
         if (c.match) return fail(c, 'busy', 'Already in a match.');
         if (this.queue.length >= this.opts.maxQueue) return fail(c, 'full', 'Matchmaking is full. Try again soon.');
         c.characterId = msg.characterId;
+        this.closeRoom(c, false);
+        this.cancelRematch(c);
         this.removeFromQueue(c);
         this.queue.push(c);
         send(c, { t: 'queued' });
@@ -248,12 +287,148 @@ export class PvpServer {
         return c.match?.forfeit(c);
       case 'ping':
         return send(c, { t: 'pong', at: msg.at, serverTime: c.match?.state.time ?? 0 });
+      case 'createRoom':
+        return this.createRoom(c, msg.characterId);
+      case 'joinRoom':
+        return this.joinRoom(c, msg.code, msg.characterId);
+      case 'closeRoom':
+        return this.closeRoom(c, true);
+      case 'rematch':
+        return this.acceptRematch(c);
+      case 'declineRematch':
+        return this.cancelRematch(c);
       case 'resume': {
         const entry = this.resumeTokens.get(msg.token);
         if (!entry || c.match) return fail(c, 'resumeFailed', 'That match is no longer available.');
         this.removeFromQueue(c);
         return entry.match.rejoin(entry.seat, c);
       }
+    }
+  }
+
+  // ---- friend rooms -----------------------------------------------------------------------
+
+  private newRoomCode(): string {
+    for (;;) {
+      let code = '';
+      for (let i = 0; i < ROOM_CODE_LENGTH; i++) code += ROOM_CODE_ALPHABET[randomInt(ROOM_CODE_ALPHABET.length)];
+      if (!this.rooms.has(code)) return code;
+    }
+  }
+
+  private createRoom(c: Conn, characterId: string) {
+    if (c.match) return fail(c, 'busy', 'Already in a match.');
+    this.removeFromQueue(c);
+    this.cancelRematch(c);
+    this.closeRoom(c, false); // one room per player: a new code replaces the old one
+    if (this.rooms.size >= this.opts.maxRooms) return fail(c, 'full', 'Too many rooms open right now. Try again soon.');
+    const code = this.newRoomCode();
+    const room: Room = {
+      code,
+      host: c,
+      characterId,
+      timer: setTimeout(() => {
+        if (this.rooms.get(code) !== room) return;
+        this.rooms.delete(code);
+        if (c.room === room) c.room = undefined;
+        send(c, { t: 'roomClosed', reason: 'expired' });
+      }, this.opts.roomTtlMs),
+    };
+    this.rooms.set(code, room);
+    c.room = room;
+    send(c, { t: 'roomCreated', code, expiresInMs: this.opts.roomTtlMs });
+  }
+
+  /** Per-IP budget for join attempts, so codes can't be guessed by brute force. */
+  private allowJoinAttempt(c: Conn): boolean {
+    const now = Date.now();
+    let a = this.joinAttempts.get(c.ip);
+    if (!a || now >= a.resetAt) {
+      a = { count: 0, resetAt: now + 60_000 };
+      this.joinAttempts.set(c.ip, a);
+      // Keep the map from growing without bound.
+      if (this.joinAttempts.size > 10_000) for (const [ip, v] of this.joinAttempts) if (now >= v.resetAt) this.joinAttempts.delete(ip);
+    }
+    a.count++;
+    return a.count <= this.opts.joinAttemptsPerMinute;
+  }
+
+  private joinRoom(c: Conn, code: string, characterId: string) {
+    if (c.match) return fail(c, 'busy', 'Already in a match.');
+    if (!this.allowJoinAttempt(c)) return fail(c, 'tooManyAttempts', 'Too many tries. Wait a minute and try again.');
+    const room = this.rooms.get(code);
+    // Same answer for every failure (unknown, expired, your own, host gone): nothing to learn by probing.
+    if (!room || room.host === c || room.host.ws.readyState !== WebSocket.OPEN || room.host.match) {
+      return fail(c, 'roomNotFound', 'No room with that code. Check it and try again.');
+    }
+    this.rooms.delete(code);
+    clearTimeout(room.timer);
+    const host = room.host;
+    host.room = undefined;
+    host.characterId = room.characterId;
+    this.removeFromQueue(host);
+    this.cancelRematch(host);
+    this.removeFromQueue(c);
+    this.closeRoom(c, false);
+    this.cancelRematch(c);
+    c.characterId = characterId;
+    this.matches.add(new Match(this, [host, c], true));
+  }
+
+  private closeRoom(c: Conn, notify: boolean) {
+    const room = c.room;
+    if (!room) return;
+    c.room = undefined;
+    clearTimeout(room.timer);
+    if (this.rooms.get(room.code) === room) this.rooms.delete(room.code);
+    if (notify) send(c, { t: 'roomClosed', reason: 'cancelled' });
+  }
+
+  // ---- friend rematches ------------------------------------------------------------------
+
+  /** Called when a friend battle ends with both players still connected. */
+  offerRematch(players: [Conn, Conn]) {
+    const offer: RematchOffer = {
+      players,
+      wants: new Set(),
+      timer: setTimeout(() => this.cancelRematch(players[0]), this.opts.rematchWindowMs),
+    };
+    for (const p of players) {
+      this.cancelRematch(p);
+      p.rematch = offer;
+      send(p, { t: 'rematch', status: 'available' });
+    }
+  }
+
+  private acceptRematch(c: Conn) {
+    const offer = c.rematch;
+    if (!offer || c.match) return send(c, { t: 'rematch', status: 'cancelled' });
+    offer.wants.add(c);
+    const other = offer.players[0] === c ? offer.players[1] : offer.players[0];
+    if (offer.wants.size < 2) {
+      send(c, { t: 'rematch', status: 'waiting' });
+      return send(other, { t: 'rematch', status: 'opponentWants' });
+    }
+    clearTimeout(offer.timer);
+    for (const p of offer.players) p.rematch = undefined;
+    if (offer.players.some((p) => p.ws.readyState !== WebSocket.OPEN || p.match)) {
+      for (const p of offer.players) send(p, { t: 'rematch', status: 'cancelled' });
+      return;
+    }
+    for (const p of offer.players) {
+      this.removeFromQueue(p);
+      this.closeRoom(p, false);
+    }
+    this.matches.add(new Match(this, offer.players, true));
+  }
+
+  private cancelRematch(c: Conn) {
+    const offer = c.rematch;
+    if (!offer) return;
+    clearTimeout(offer.timer);
+    for (const p of offer.players) {
+      if (p.rematch === offer) p.rematch = undefined;
+      if (p !== c) send(p, { t: 'rematch', status: 'cancelled' });
     }
   }
 
@@ -274,8 +449,7 @@ export class PvpServer {
         this.queue.unshift(a);
         continue;
       }
-      const m = new Match(this, [a, b]);
-      this.matches.add(m);
+      this.matches.add(new Match(this, [a, b], false));
     }
   }
 
@@ -305,6 +479,8 @@ class Match {
   constructor(
     private server: PvpServer,
     players: [Conn, Conn],
+    /** A friend battle: offers a rematch when it ends. */
+    private friendly: boolean,
   ) {
     const o = server.opts;
     this.seats = [players[0], players[1]];
@@ -330,6 +506,7 @@ class Match {
         state: snapshot,
         startsInMs: o.startDelayMs,
         resumeToken: this.tokens[seat],
+        friendly: friendly || undefined,
       });
     });
     this.timer = setInterval(() => this.step(), TICK_MS);
@@ -429,6 +606,10 @@ class Match {
       }
     }
     this.server.forget(this);
+    const [a, b] = this.seats;
+    if (this.friendly && reason !== 'server' && a && b && a.ws.readyState === WebSocket.OPEN && b.ws.readyState === WebSocket.OPEN) {
+      this.server.offerRematch([a, b]);
+    }
     this.server.opts.log(`match ${this.id} over: winner=${winner ?? 'none'} reason=${reason} t=${(this.state.time / 1000).toFixed(1)}s`);
   }
 }

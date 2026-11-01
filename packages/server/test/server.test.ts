@@ -253,3 +253,132 @@ describe('PVP server', () => {
     expect(a.got.filter((m) => m.t === 'events')).toHaveLength(0);
   });
 });
+
+// ---- friend rooms --------------------------------------------------------------------------
+
+async function ready(url: string, name = 'Tester') {
+  const c = raw(url);
+  await c.open;
+  c.send({ t: 'hello', version: PROTOCOL_VERSION, name });
+  await c.waitFor((m) => m.t === 'welcome');
+  return c;
+}
+
+describe('friend rooms', () => {
+  it('pairs a host and a friend by code, once', async () => {
+    const url = await start();
+    const host = await ready(url, 'Host');
+    const friend = await ready(url, 'Friend');
+    host.send({ t: 'createRoom', characterId: 'rime' });
+    const room = (await host.waitFor((m) => m.t === 'roomCreated')) as Extract<ServerMessage, { t: 'roomCreated' }>;
+    expect(room.code).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/);
+    // Typed loosely (lowercase, a dash) still works.
+    friend.send({ t: 'joinRoom', code: `${room.code.slice(0, 3).toLowerCase()}-${room.code.slice(3)}`, characterId: 'volt' });
+    const fh = (await host.waitFor((m) => m.t === 'matchFound')) as Extract<ServerMessage, { t: 'matchFound' }>;
+    const ff = (await friend.waitFor((m) => m.t === 'matchFound')) as Extract<ServerMessage, { t: 'matchFound' }>;
+    expect(fh.friendly && ff.friendly).toBe(true);
+    expect(fh.opponent).toEqual({ name: 'Friend', characterId: 'volt' });
+    expect(ff.opponent).toEqual({ name: 'Host', characterId: 'rime' });
+    // Codes are single-use.
+    const late = await ready(url, 'Late');
+    late.send({ t: 'joinRoom', code: room.code, characterId: 'ember' });
+    await late.waitFor((m) => m.t === 'error' && m.code === 'roomNotFound');
+  });
+
+  it("gives the same answer for unknown codes and your own room, and rejects junk", async () => {
+    const url = await start();
+    const host = await ready(url);
+    host.send({ t: 'createRoom', characterId: 'ember' });
+    const room = (await host.waitFor((m) => m.t === 'roomCreated')) as Extract<ServerMessage, { t: 'roomCreated' }>;
+    host.send({ t: 'joinRoom', code: room.code, characterId: 'ember' });
+    const own = await host.waitFor((m) => m.t === 'error');
+    const other = await ready(url);
+    other.send({ t: 'joinRoom', code: 'ZZZZZZ', characterId: 'ember' });
+    const unknown = await other.waitFor((m) => m.t === 'error');
+    expect(own).toEqual(unknown);
+    other.send({ t: 'joinRoom', code: 'O0O0O0', characterId: 'ember' }); // not in the alphabet
+    other.send({ t: 'joinRoom', code: room.code, characterId: 'constructor' });
+    await new Promise((r) => setTimeout(r, 150));
+    expect(other.got.filter((m) => m.t === 'error' && m.code === 'badMessage')).toHaveLength(2);
+  });
+
+  it('stops code guessing', async () => {
+    const url = await start({ joinAttemptsPerMinute: 3 });
+    const guesser = await ready(url);
+    for (const code of ['AAAAAA', 'BBBBBB', 'CCCCCC', 'DDDDDD']) guesser.send({ t: 'joinRoom', code, characterId: 'ember' });
+    await guesser.waitFor((m) => m.t === 'error' && m.code === 'tooManyAttempts');
+    // A fresh connection from the same IP doesn't reset the budget.
+    const again = await ready(url);
+    again.send({ t: 'joinRoom', code: 'EEEEEE', characterId: 'ember' });
+    await again.waitFor((m) => m.t === 'error' && m.code === 'tooManyAttempts');
+  });
+
+  it('expires rooms and closes them when the host leaves', async () => {
+    const url = await start({ roomTtlMs: 150 });
+    const host = await ready(url);
+    host.send({ t: 'createRoom', characterId: 'nyx' });
+    const room = (await host.waitFor((m) => m.t === 'roomCreated')) as Extract<ServerMessage, { t: 'roomCreated' }>;
+    await host.waitFor((m) => m.t === 'roomClosed' && m.reason === 'expired');
+    const friend = await ready(url);
+    friend.send({ t: 'joinRoom', code: room.code, characterId: 'ember' });
+    await friend.waitFor((m) => m.t === 'error' && m.code === 'roomNotFound');
+
+    const host2 = await ready(url);
+    host2.send({ t: 'createRoom', characterId: 'nyx' });
+    const room2 = (await host2.waitFor((m) => m.t === 'roomCreated')) as Extract<ServerMessage, { t: 'roomCreated' }>;
+    host2.ws.close();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(server!.stats.rooms).toBe(0);
+    friend.send({ t: 'joinRoom', code: room2.code, characterId: 'ember' });
+    await friend.waitFor((m) => m.t === 'error' && m.code === 'roomNotFound' && friend.got.filter((x) => x.t === 'error').length === 2);
+  });
+
+  it('offers a rematch after a friend battle, and starts it when both agree', async () => {
+    const url = await start();
+    const a = await ready(url, 'A');
+    const b = await ready(url, 'B');
+    a.send({ t: 'createRoom', characterId: 'briar' });
+    const room = (await a.waitFor((m) => m.t === 'roomCreated')) as Extract<ServerMessage, { t: 'roomCreated' }>;
+    b.send({ t: 'joinRoom', code: room.code, characterId: 'ember' });
+    await a.waitFor((m) => m.t === 'matchFound');
+    a.send({ t: 'forfeit' });
+    await a.waitFor((m) => m.t === 'rematch' && m.status === 'available');
+    await b.waitFor((m) => m.t === 'rematch' && m.status === 'available');
+    a.send({ t: 'rematch' });
+    await a.waitFor((m) => m.t === 'rematch' && m.status === 'waiting');
+    await b.waitFor((m) => m.t === 'rematch' && m.status === 'opponentWants');
+    b.send({ t: 'rematch' });
+    await new Promise((r) => setTimeout(r, 150));
+    const founds = a.got.filter((m) => m.t === 'matchFound') as Extract<ServerMessage, { t: 'matchFound' }>[];
+    expect(founds).toHaveLength(2);
+    expect(founds[1]).toMatchObject({ friendly: true, opponent: { name: 'B', characterId: 'ember' } });
+  });
+
+  it('cancels the rematch offer when one player declines or leaves', async () => {
+    const url = await start();
+    const a = await ready(url, 'A');
+    const b = await ready(url, 'B');
+    a.send({ t: 'createRoom', characterId: 'briar' });
+    const room = (await a.waitFor((m) => m.t === 'roomCreated')) as Extract<ServerMessage, { t: 'roomCreated' }>;
+    b.send({ t: 'joinRoom', code: room.code, characterId: 'ember' });
+    await a.waitFor((m) => m.t === 'matchFound');
+    b.send({ t: 'forfeit' });
+    await a.waitFor((m) => m.t === 'rematch' && m.status === 'available');
+    a.send({ t: 'rematch' });
+    b.send({ t: 'declineRematch' });
+    await a.waitFor((m) => m.t === 'rematch' && m.status === 'cancelled');
+    // Too late to accept now.
+    b.send({ t: 'rematch' });
+    await b.waitFor((m) => m.t === 'rematch' && m.status === 'cancelled');
+    // Quick Match players never get rematch offers.
+    const q1 = await ready(url, 'Q1');
+    const q2 = await ready(url, 'Q2');
+    q1.send({ t: 'queue', characterId: 'ember' });
+    q2.send({ t: 'queue', characterId: 'ember' });
+    await q1.waitFor((m) => m.t === 'matchFound');
+    q1.send({ t: 'forfeit' });
+    await q2.waitFor((m) => m.t === 'matchOver');
+    await new Promise((r) => setTimeout(r, 100));
+    expect(q2.got.some((m) => m.t === 'rematch')).toBe(false);
+  });
+});

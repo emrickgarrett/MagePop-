@@ -584,6 +584,8 @@ export interface ResultInfo {
   unlocked?: string | null;
   stats: { label: string; value: string }[];
   actions: { label: string; onClick: () => void; primary?: boolean }[];
+  /** Extra live content under the buttons (e.g. friend rematch status). */
+  extra?: ReactNode;
 }
 
 export function ResultScreen({ info }: { info: ResultInfo }) {
@@ -633,6 +635,7 @@ export function ResultScreen({ info }: { info: ResultInfo }) {
           </button>
         ))}
       </div>
+      {info.extra}
     </div>
   );
 }

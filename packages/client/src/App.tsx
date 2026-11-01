@@ -17,7 +17,7 @@ import {
   writeSave,
 } from './game/save';
 import { BattleScreen } from './screens/BattleScreen';
-import { MultiplayerLobby } from './screens/Multiplayer';
+import { FriendRematch, MultiplayerLobby } from './screens/Multiplayer';
 import { NetBattleController, pvp } from './game/pvp';
 import { AchievementsScreen, AchievementToasts, Toast, toastsFor } from './screens/Achievements';
 import { evaluateAchievements } from './game/achievements';
@@ -271,13 +271,14 @@ export function App() {
   const playOnline = (found: Extract<ServerMessage, { t: 'matchFound' }>) => {
     const mine = found.state.players[found.you].characterId;
     const name = found.opponent.name;
+    const friendly = !!found.friendly;
     setScreen({
       name: 'battle',
       // seed only keys the screen; the server owns the real battle.
       setup: { seed: newSeed(), player: mine, opponent: found.opponent.characterId, aiLevel: aiLevel(0) },
-      header: `Online · vs ${name} (${getCharacter(found.opponent.characterId).name})`,
+      header: `${friendly ? 'Friend Battle' : 'Online'} · vs ${name} (${getCharacter(found.opponent.characterId).name})`,
       mode: 'pvp',
-      detail: 'Online',
+      detail: friendly ? 'Friend battle' : 'Online',
       opponentName: name,
       music: battleTheme(mine),
       makeController: (onEnd) => new NetBattleController(pvp, found, onEnd),
@@ -295,8 +296,17 @@ export function App() {
             subtitle: cancelled ? "The server restarted, so this match doesn't count." : draw ? "Time's up with HP tied." : why[r.reason ?? 'ko'],
             stats: statsOf(r),
             actions: [
-              { label: 'Rematch', primary: true, onClick: () => setScreen({ name: 'pvp', autoQueue: true }) },
-              { label: 'Multiplayer', onClick: () => setScreen({ name: 'pvp' }) },
+              friendly
+                ? // Friend battles: ask the same friend for another round (starts when both agree).
+                  { label: 'Rematch', primary: true, onClick: () => pvp.requestRematch() }
+                : { label: 'Rematch', primary: true, onClick: () => setScreen({ name: 'pvp', autoQueue: true }) },
+              {
+                label: 'Multiplayer',
+                onClick: () => {
+                  if (friendly) pvp.declineRematch();
+                  setScreen({ name: 'pvp' });
+                },
+              },
               {
                 label: 'Main menu',
                 onClick: () => {
@@ -305,6 +315,7 @@ export function App() {
                 },
               },
             ],
+            extra: friendly && !cancelled ? <FriendRematch friend={name} onMatch={playOnline} /> : undefined,
           },
         });
       },

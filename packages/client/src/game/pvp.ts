@@ -15,6 +15,7 @@ import {
   eventsForSeat,
   isCharacterId,
   MatchEndReason,
+  normalizeRoomCode,
   OpponentInfo,
   PlayerIndex,
   PlayerState,
@@ -65,7 +66,7 @@ export function parseServerMessage(text: string): ServerMessage | null {
       const startsInMs = Math.max(0, Math.min(10_000, m.startsInMs));
       if (m.t === 'resumed') return { t: 'resumed', you: m.you, opponent, state: m.state, startsInMs };
       if (typeof m.resumeToken !== 'string') return null;
-      return { t: 'matchFound', you: m.you, opponent, state: m.state, startsInMs, resumeToken: m.resumeToken };
+      return { t: 'matchFound', you: m.you, opponent, state: m.state, startsInMs, resumeToken: m.resumeToken, friendly: m.friendly === true };
     }
     case 'events':
       if (!isNum(m.time) || !Array.isArray(m.events)) return null;
@@ -86,6 +87,16 @@ export function parseServerMessage(text: string): ServerMessage | null {
     }
     case 'error':
       return { t: 'error', code: String(m.code).slice(0, 32) as never, message: String(m.message).slice(0, 200) };
+    case 'roomCreated': {
+      const code = normalizeRoomCode(m.code);
+      return code && isNum(m.expiresInMs) ? { t: 'roomCreated', code, expiresInMs: m.expiresInMs } : null;
+    }
+    case 'roomClosed':
+      return m.reason === 'expired' || m.reason === 'cancelled' ? { t: 'roomClosed', reason: m.reason } : null;
+    case 'rematch':
+      return ['available', 'opponentWants', 'waiting', 'cancelled'].includes(m.status as string)
+        ? { t: 'rematch', status: m.status as 'available' | 'opponentWants' | 'waiting' | 'cancelled' }
+        : null;
     case 'notice':
       return { t: 'notice', message: String(m.message).slice(0, 200) };
     case 'pong':
@@ -97,7 +108,7 @@ export function parseServerMessage(text: string): ServerMessage | null {
 
 // ---- connection ------------------------------------------------------------------------------
 
-export type LinkStatus = 'idle' | 'connecting' | 'ready' | 'queued' | 'inMatch' | 'reconnecting' | 'closed';
+export type LinkStatus = 'idle' | 'connecting' | 'ready' | 'queued' | 'hosting' | 'inMatch' | 'reconnecting' | 'closed';
 type MatchFound = Extract<ServerMessage, { t: 'matchFound' }>;
 
 /**
@@ -108,6 +119,11 @@ export class PvpLink {
   status: LinkStatus = 'idle';
   /** Last error to show the player, if any. */
   error: string | null = null;
+  /** The friend-room code we're hosting, while waiting for a friend. */
+  roomCode: string | null = null;
+  roomExpiresAt = 0;
+  /** Latest friend-rematch status (the result screen appears after the server sends it). */
+  rematchStatus: 'available' | 'opponentWants' | 'waiting' | 'cancelled' | null = null;
   private ws: WebSocket | null = null;
   private name = 'Mage';
   private resumeToken: string | null = null;
@@ -136,7 +152,7 @@ export class PvpLink {
   /** Connect (if needed) and say hello. Resolves once the server welcomes us. */
   connect(name: string): Promise<void> {
     this.name = sanitizeName(name);
-    if (this.ws && (this.status === 'ready' || this.status === 'queued')) return Promise.resolve();
+    if (this.ws && (this.status === 'ready' || this.status === 'queued' || this.status === 'hosting')) return Promise.resolve();
     return new Promise((resolve, reject) => {
       this.setStatus('connecting', null);
       this.open(
@@ -206,9 +222,23 @@ export class PvpLink {
       case 'queued':
         this.setStatus('queued', null);
         break;
+      case 'rematch':
+        this.rematchStatus = msg.status;
+        break;
       case 'matchFound':
         this.resumeToken = msg.resumeToken;
+        this.roomCode = null;
+        this.rematchStatus = null;
         this.setStatus('inMatch', null);
+        break;
+      case 'roomCreated':
+        this.roomCode = msg.code;
+        this.roomExpiresAt = Date.now() + msg.expiresInMs;
+        this.setStatus('hosting', null);
+        break;
+      case 'roomClosed':
+        this.roomCode = null;
+        this.setStatus('ready', msg.reason === 'expired' ? 'Your room code expired. Make a new one to keep waiting.' : null);
         break;
       case 'resumed':
         this.setStatus('inMatch', null);
@@ -224,7 +254,7 @@ export class PvpLink {
           this.emit({ t: 'matchOver', winner: null, reason: 'disconnect' });
           return;
         }
-        this.setStatus(this.status === 'queued' ? 'ready' : this.status, msg.message);
+        this.setStatus(this.status === 'queued' || this.status === 'connecting' ? 'ready' : this.status, msg.message);
         break;
       case 'notice':
         this.error = msg.message;
@@ -245,6 +275,29 @@ export class PvpLink {
     this.send({ t: 'queue', characterId });
   }
 
+  createRoom(characterId: string) {
+    this.send({ t: 'createRoom', characterId });
+  }
+
+  joinRoom(code: string, characterId: string) {
+    this.error = null;
+    this.send({ t: 'joinRoom', code, characterId });
+  }
+
+  closeRoom() {
+    this.send({ t: 'closeRoom' });
+    this.roomCode = null;
+    if (this.status === 'hosting') this.setStatus('ready', null);
+  }
+
+  requestRematch() {
+    this.send({ t: 'rematch' });
+  }
+
+  declineRematch() {
+    this.send({ t: 'declineRematch' });
+  }
+
   cancelQueue() {
     this.send({ t: 'cancelQueue' });
     if (this.status === 'queued') this.setStatus('ready', null);
@@ -252,6 +305,7 @@ export class PvpLink {
 
   close() {
     this.resumeToken = null;
+    this.roomCode = null;
     const ws = this.ws;
     this.ws = null;
     ws?.close();

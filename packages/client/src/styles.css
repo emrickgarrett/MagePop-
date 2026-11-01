@@ -2734,3 +2734,81 @@ small {
   background: rgba(255, 210, 94, 0.15);
   color: #ffd36b;
 }
+
+/* ---- Friend battles ---- */
+.mp-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mp-card.slim {
+  padding: 14px 18px;
+}
+.mp-card.slim h3 {
+  font-size: 18px;
+  margin: 4px 0 2px;
+}
+.small-print {
+  font-size: 13px;
+}
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.code-input {
+  width: 9.5em;
+  font: inherit;
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 0.25em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ink);
+}
+.room-code {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.room-code span {
+  width: 52px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 36px;
+  background: color-mix(in srgb, var(--accent) 22%, rgba(0, 0, 0, 0.35));
+  border: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent);
+  user-select: all;
+}
+.rematch-note {
+  margin-top: 4px;
+  padding: 8px 16px;
+  border-radius: 99px;
+  background: var(--panel);
+  color: var(--ink-dim);
+}
+.rematch-note.opponentWants {
+  color: #ffd36b;
+  border: 1px solid rgba(255, 211, 107, 0.6);
+  animation: update-pop 0.35s ease-out;
+}
+.rematch-note.cancelled {
+  color: #ff9aaa;
+}
+.mp-search {
+  flex-wrap: wrap;
+}
+.mp-search > div:nth-child(2) {
+  min-width: 180px;
+}
