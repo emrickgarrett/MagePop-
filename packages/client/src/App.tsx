@@ -32,6 +32,7 @@ import { evaluateAchievements } from './game/achievements';
 import { MatchHistory } from './screens/MatchHistory';
 import { CharacterSelect, Collection, MainMenu, ResultInfo, ResultScreen, SettingsScreen, StoryMap } from './screens/Menus';
 import { StoryScene } from './screens/StoryScene';
+import { RotateHint } from './components/RotateHint';
 
 type Screen =
   | { name: 'menu' }
@@ -553,6 +554,7 @@ export function App() {
   return (
     <>
       {renderScreen()}
+      <RotateHint />
       <AchievementToasts toasts={toasts} onDone={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
     </>
   );

@@ -4,7 +4,7 @@ import { BoardView } from '../components/BoardView';
 import { SpellLegend } from '../components/Hud';
 import { SpellFxLayer } from '../components/SpellFx';
 import { audio } from '../game/audio';
-import { viewport } from '../game/platform';
+import { isPortrait, viewport } from '../game/platform';
 import { BattleController } from '../game/BattleController';
 import type { Settings } from '../game/save';
 import { themedBoardSrc } from '../game/themes';
@@ -137,7 +137,7 @@ export function PuzzleScreen({
     }
   };
 
-  const cell = Math.min(84, Math.floor((viewport().h - 330) / stage.layout.length));
+  const cell = Math.min(84, Math.floor((viewport().h - (isPortrait() ? 440 : 330)) / stage.layout.length), Math.floor((viewport().w - 24) / stage.layout[0].length));
 
   return (
     <div className="battle-screen puzzle-screen" ref={rootRef}>

@@ -3967,3 +3967,326 @@ small {
   inset: 0;
   background: radial-gradient(ellipse 75% 65% at 50% 55%, transparent 40%, rgba(8, 3, 20, 0.6));
 }
+
+/* =========================================================================================
+   Touch devices (phones, tablets) — applies everywhere, harmless with a mouse.
+   ========================================================================================= */
+html {
+  /* No gray flash over whatever you tap (whole-screen tap targets like story scenes flashed). */
+  -webkit-tap-highlight-color: transparent;
+  /* No double-tap zoom or 300ms tap delay; no pull-to-refresh/bounce while dragging gems. */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  -webkit-user-select: none;
+  /* No "Save image / Copy" menu when a finger rests on a gem or portrait. */
+  -webkit-touch-callout: none;
+}
+img {
+  -webkit-user-drag: none;
+}
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Landscape phone hint (see ShortLandscapeHint in App.tsx). */
+.rotate-hint {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 4, 26, 0.94);
+  text-align: center;
+}
+.rotate-hint .rotate-icon {
+  font-size: 54px;
+  animation: rotate-nudge 2.4s ease-in-out infinite;
+}
+.rotate-hint h3 {
+  font-family: var(--display);
+  font-size: 26px;
+  margin: 10px 0 6px;
+}
+.rotate-hint p {
+  color: var(--ink-dim);
+  margin: 0 0 18px;
+}
+@keyframes rotate-nudge {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  30% {
+    transform: rotate(-90deg);
+  }
+}
+
+/* =========================================================================================
+   Portrait layout (phones held upright, iPads in portrait). html.vertical is set by
+   fitToWindow() in game/platform.ts; the page is designed for >= 430px wide here.
+   ========================================================================================= */
+html.vertical .framed {
+  padding: 14px 12px 24px;
+}
+html.vertical .frame-top {
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+html.vertical .frame-top h2 {
+  font-size: 26px;
+  text-align: center;
+}
+html.vertical .frame-right {
+  justify-self: end;
+}
+
+/* Main menu */
+html.vertical .menu-screen {
+  gap: 22px;
+  padding: 16px 12px;
+}
+html.vertical .logo h1 {
+  font-size: 68px;
+}
+html.vertical .logo-sub {
+  font-size: 13px;
+  letter-spacing: 0.3em;
+}
+html.vertical .menu-buttons {
+  width: min(340px, 100%);
+}
+html.vertical .menu-row {
+  gap: 8px;
+  max-width: 420px;
+}
+html.vertical .btn.mid {
+  min-width: 0;
+  padding: 10px 18px;
+  font-size: 16px;
+}
+
+/* Stacked two-column screens */
+html.vertical .select-layout,
+html.vertical .story-layout,
+html.vertical .mp-lobby {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+/* Story map: chapters become a scrollable strip, the stage path fits the width */
+html.vertical .chapter-list {
+  flex-direction: row;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+html.vertical .chapter-list::-webkit-scrollbar {
+  display: none;
+}
+html.vertical .chapter-tab {
+  flex: 0 0 auto;
+  min-width: 190px;
+}
+html.vertical .chapter-view {
+  padding: 14px 12px;
+}
+html.vertical .node-path {
+  gap: 2px;
+  padding: 0;
+}
+html.vertical .path-node {
+  width: auto;
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 11px;
+}
+html.vertical .story-summary {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Battle: opponent compact on top, your board full width below */
+html.vertical .battle-screen {
+  padding: 8px 8px 10px;
+}
+html.vertical .battle-top {
+  grid-template-columns: 1fr auto;
+}
+html.vertical .battle-hint {
+  display: none;
+}
+html.vertical .battle-header {
+  font-size: 14px;
+}
+html.vertical .arena {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-top: 4px;
+}
+html.vertical .vs {
+  display: none;
+}
+html.vertical .arena-side {
+  gap: 6px;
+  width: 100%;
+  align-items: center;
+}
+html.vertical .arena-side.foe {
+  order: -1;
+  margin-top: 0;
+  align-self: auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'board panel'
+    'board legend';
+  align-items: start;
+  justify-content: center;
+  column-gap: 10px;
+  row-gap: 6px;
+}
+html.vertical .arena-side.foe > .board-wrap {
+  grid-area: board;
+}
+html.vertical .arena-side.foe > .player-panel {
+  grid-area: panel;
+}
+html.vertical .arena-side.foe > .spell-legend {
+  grid-area: legend;
+}
+html.vertical .arena-side.foe .callout-stage {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+html.vertical .arena-side .player-panel {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  gap: 10px;
+}
+html.vertical .arena-side.me .spell-legend {
+  width: 100%;
+}
+
+/* Visual-novel story scenes: bigger actors that overlap, text box across the bottom */
+html.vertical .vn-actor {
+  width: 78%;
+  bottom: 120px;
+}
+html.vertical .vn-actor.left {
+  left: -14%;
+}
+html.vertical .vn-actor.right {
+  right: -14%;
+}
+html.vertical .vn-box {
+  width: calc(100% - 16px);
+  bottom: 8px;
+  min-height: 0;
+  padding: 20px 16px 10px;
+}
+html {
+  background: var(--bg-0);
+}
+html.vertical .story-summary {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 14px;
+}
+html.vertical .story-summary .ss-progress {
+  width: 100%;
+}
+html.vertical .story-summary .story-diff {
+  align-self: center;
+}
+html.vertical .story-summary > .btn {
+  white-space: normal;
+}
+html.vertical .rewards-head {
+  flex-wrap: wrap;
+}
+html.vertical .rewards-head .rh-next {
+  flex-basis: 100%;
+}
+html.vertical .rewards-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+html.vertical .char-grid {
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+}
+/* Lessons: goal card above the board */
+html.vertical .puzzle-arena {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+}
+html.vertical .puzzle-goal {
+  order: -1;
+  width: 100%;
+  padding: 14px 16px;
+  gap: 8px;
+}
+html.vertical .puzzle-text {
+  font-size: 16px;
+}
+html.vertical .vn-screen {
+  overflow: hidden;
+}
+/* Spell legends: five narrow columns (gem over names) instead of five wide pills */
+html.vertical .spell-legend {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+html.vertical .legend-row {
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 2px;
+  min-width: 0;
+}
+html.vertical .legend-names {
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  text-align: center;
+}
+html.vertical .legend-names span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html.vertical .arena-side.foe .legend-names {
+  display: none;
+}
+html.vertical .arena-side.foe .legend-row {
+  padding: 3px 1px;
+}
+html.vertical .legend-tip {
+  width: min(300px, 90vw);
+}
+/* Opponent panel is narrow beside its board: tag on its own line, smaller portrait text */
+html.vertical .arena-side.foe .pp-name {
+  white-space: normal;
+  font-size: 16px;
+  line-height: 1.25;
+}
+html.vertical .arena-side.foe .pp-name small {
+  display: none;
+}
+html.vertical .arena-side.foe .pp-tag {
+  display: inline-block;
+  margin-bottom: 2px;
+}

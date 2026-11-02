@@ -57,23 +57,41 @@ export const updater = {
 };
 
 /**
- * Browser builds run inside whatever space the page gives them (an itch.io embed, a small laptop
- * window). The UI is laid out for at least the desktop app's minimum window, so below that size the
- * whole page is zoomed out to fit instead of overflowing. The desktop app never needs this.
+ * Browser builds run inside whatever space the page gives them (an itch.io embed, a laptop window,
+ * a phone, an iPad). Two layouts:
+ *  - landscape: laid out for at least the desktop app's minimum window (1200×760); smaller windows
+ *    zoom the whole page out to fit instead of overflowing.
+ *  - portrait (taller than wide: phones held upright, iPads in portrait): a stacked layout
+ *    (`html.vertical` in styles.css) designed for 430px wide; narrower screens zoom out to fit.
+ * The desktop app always uses the landscape layout at 100%.
  */
 const MIN_W = 1200;
 const MIN_H = 760;
+const PORTRAIT_W = 430;
 
 let zoom = 1;
+let portrait = false;
 
 /** The window size in the page's own CSS pixels (after the browser-build zoom above). */
 export const viewport = () => ({ w: window.innerWidth / zoom, h: window.innerHeight / zoom });
 
+/** True when the stacked phone/tablet-upright layout is in use. */
+export const isPortrait = () => portrait;
+
+/** A phone (or small tablet) on its side: too short for the landscape layout to be comfortable. */
+export const isShortLandscape = () => !isDesktop && !portrait && window.innerHeight < 500 && matchMedia('(pointer: coarse)').matches;
+
 export function fitToWindow() {
   if (isDesktop) return;
   const apply = () => {
-    zoom = Number(Math.min(1, window.innerWidth / MIN_W, window.innerHeight / MIN_H).toFixed(4));
-    document.documentElement.style.setProperty('zoom', zoom < 1 ? String(zoom) : '');
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    portrait = h > w;
+    zoom = Number((portrait ? Math.min(1, w / PORTRAIT_W) : Math.min(1, w / MIN_W, h / MIN_H)).toFixed(4));
+    const root = document.documentElement;
+    root.classList.toggle('vertical', portrait);
+    root.classList.toggle('touch', matchMedia('(pointer: coarse)').matches);
+    root.style.setProperty('zoom', zoom < 1 ? String(zoom) : '');
   };
   apply();
   window.addEventListener('resize', apply);

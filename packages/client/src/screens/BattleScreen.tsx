@@ -10,12 +10,19 @@ import { NetBattleController, pvp } from '../game/pvp';
 import type { Settings } from '../game/save';
 import { themedBoardSrc } from '../game/themes';
 import { audio } from '../game/audio';
-import { viewport } from '../game/platform';
+import { isPortrait, viewport } from '../game/platform';
 
 function useCellSize() {
   const calc = () => {
     const { w, h } = viewport();
-    const big = Math.max(40, Math.min(76, Math.floor((h - 290) / 8), Math.floor((w * 0.5) / 8)));
+    if (isPortrait()) {
+      // Stacked: the opponent's board (half size) above yours, which spans the screen width.
+      // About 290px of panels, legend and padding plus 8 rows of each board.
+      const big = Math.max(34, Math.min(76, Math.floor((w - 24) / 8), Math.floor((h - 290) / 12)));
+      return { big, small: Math.max(16, Math.floor(big * 0.5)) };
+    }
+    // Side by side: your column plus the opponent's (whose panel is ~490px whatever the board size).
+    const big = Math.max(40, Math.min(76, Math.floor((h - 290) / 8), Math.floor((w * 0.5) / 8), Math.floor((w - 650) / 8)));
     return { big, small: Math.max(28, Math.floor(big * 0.62)) };
   };
   const [size, setSize] = useState(calc);
