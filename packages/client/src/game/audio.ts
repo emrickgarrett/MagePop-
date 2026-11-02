@@ -1,7 +1,7 @@
 /**
  * Game audio: crossfading, looping music + event sound effects.
  *
- * Music files: public/assets/music/<track>.mp3 (missing tracks are silently skipped).
+ * Music files: public/assets/music/<track>.webm (Opus; see tools/process_music.py; missing tracks are silently skipped).
  * Sound effects: public/assets/sfx/<name>.(ogg|mp3|wav). Until a file exists, each effect is
  * synthesized with Web Audio so the game is never silent.
  */
@@ -174,7 +174,7 @@ class AudioEngine {
 
   private startDeck(track: MusicTrack, at: number, fadeIn: number): Deck | null {
     const ctx = this.ctx!;
-    const el = new Audio(`assets/music/${track}.mp3`);
+    const el = new Audio(`assets/music/${track}.webm`);
     el.preload = 'auto';
     const gain = ctx.createGain();
     gain.gain.value = 0;

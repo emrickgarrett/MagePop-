@@ -1,4 +1,5 @@
-Game music (MP3). Exact file names:
-menu.mp3, story.mp3, endless.mp3, victory.mp3, defeat.mp3,
-battle-ember.mp3, battle-rime.mp3, battle-briar.mp3, battle-nyx.mp3, battle-volt.mp3, battle-hollow.mp3
-Missing files are simply skipped (silence).
+Game music: WebM/Opus at 96 kbps, made by tools/process_music.py from the original MP3s in
+art/wip/music/ (git-ignored). Exact names:
+menu, story, endless, victory, defeat,
+battle-ember, battle-rime, battle-briar, battle-nyx, battle-volt, battle-hollow  (.webm)
+Missing files are simply skipped (silence). Don't commit MP3/WAV here; encode new tracks with the script.
