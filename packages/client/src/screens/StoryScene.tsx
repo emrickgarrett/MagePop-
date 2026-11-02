@@ -8,7 +8,7 @@ import { Gem } from '../components/Gem';
  */
 
 const SCENE_SRC = (id: string) => `assets/scenes/${id}.jpg`;
-const MAIN_PORTRAIT = (id: string) => `assets/portraits/${id}.png`;
+const MAIN_PORTRAIT = (id: string) => `assets/portraits/${id}.webp`;
 
 /** Mages with a face-hidden portrait, shown while the story still calls them "???". */
 const SHROUDED = new Set(['hollow']);

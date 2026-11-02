@@ -73,7 +73,7 @@ an entry they fall back to their palette with sparks and lightning.
 
 All art is generated with GameDeveloperHarness into `art/` (the raw outputs), then made game-ready:
 
-- **Portraits**: `packages/client/public/assets/portraits/<mageId>.png`
+- **Portraits**: `packages/client/public/assets/portraits/<mageId>.webp`
 - **Gem sets** (one themed set per mage, shapes differ but colors stay fixed so spell colors read
   the same everywhere): `packages/client/public/assets/gems/<mageId>/<color>.png`
 - **Board backgrounds**: `packages/client/public/assets/boards/<mageId>.jpg`
@@ -141,6 +141,11 @@ and `MagePop-<version>-portable.exe` (single file, no install). macOS builds a `
 The tag is the version: the workflow stamps it into the app, so there's nothing to bump first (the
 `version` in `apps/desktop/package.json` only matters for local builds). Installed copies update
 themselves once a release is **published**; drafts are invisible to them.
+
+**Languages:** the game is English-only, so the desktop build ships only Electron's `en-US` language
+pack (`electronLanguages` in `apps/desktop/package.json`). That saves ~8MB of Chromium translations.
+If the game gets translated later, add those locales there too (e.g. `"de"`, `"ja"`, `"zh-TW"`), or
+Chromium's own menus, dialogs and spellcheck will fall back to English for those players.
 
 Builds are unsigned for now, so Windows SmartScreen shows "unknown publisher" (More info → Run anyway)
 and macOS needs right-click → Open the first time.

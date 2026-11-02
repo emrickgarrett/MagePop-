@@ -585,7 +585,7 @@ function StageBanner({ v, t, r }: { v: Vfx; t: number; r: Rect }) {
       {ch && (
         <img
           className="fx-stage-face"
-          src={`assets/portraits/${ch.id}.png`}
+          src={`assets/portraits/${ch.id}.webp`}
           alt=""
           onError={(e) => (e.currentTarget.style.display = 'none')}
           style={{
@@ -633,7 +633,7 @@ function UltimateBanner({ v, t, r, onStage = false }: { v: Vfx; t: number; r: Re
           '--c': v.color,
         } as CSSProperties}
       >
-        {ch && <img src={`assets/portraits/${ch.id}.png`} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+        {ch && <img src={`assets/portraits/${ch.id}.webp`} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />}
         <div className="fx-ult-text">
           <small>ULTIMATE</small>
           <span>{v.label}</span>
@@ -646,7 +646,7 @@ function UltimateBanner({ v, t, r, onStage = false }: { v: Vfx; t: number; r: Re
     <div className="fx-aura" style={{ left: r.x, top: r.y, width: r.w, height: r.h }}>
       {!onStage && <div className="fx-tint" style={{ background: v.color, opacity: flash * 0.45 }} />}
       <div className="fx-ult-band" style={{ transform: `translateX(${x * 110}%) skewY(-6deg)`, '--c': v.color } as CSSProperties}>
-        {ch && <img src={`assets/portraits/${ch.id}.png`} alt="" className="fx-ult-portrait" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+        {ch && <img src={`assets/portraits/${ch.id}.webp`} alt="" className="fx-ult-portrait" onError={(e) => (e.currentTarget.style.display = 'none')} />}
         <div className="fx-ult-text">
           <small style={{ fontSize: Math.max(9, r.w * 0.022) }}>ULTIMATE</small>
           <span style={{ fontSize: Math.max(16, Math.min(40, r.w * 0.065)) }}>{v.label}</span>

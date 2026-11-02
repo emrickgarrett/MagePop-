@@ -16,7 +16,7 @@ export function Portrait({ ch, size = 96, locked = false, frame }: { ch: Charact
       }}
     >
       {imgOk && !locked && (
-        <img src={`assets/portraits/${ch.id}.png`} alt="" onError={() => setImgOk(false)} draggable={false} />
+        <img src={`assets/portraits/${ch.id}.webp`} alt="" onError={() => setImgOk(false)} draggable={false} />
       )}
       {(!imgOk || locked) && <span style={{ fontSize: size * 0.5 }}>{locked ? '?' : ch.sigil}</span>}
     </div>
