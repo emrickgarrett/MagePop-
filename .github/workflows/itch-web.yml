@@ -5,7 +5,7 @@
 #
 # One-time setup (repo Settings → Secrets and variables → Actions):
 #   - secret   BUTLER_API_KEY  an itch.io API key (itch.io → Settings → API keys). Never in the repo.
-#   - variable ITCH_GAME       "<itch username>/<game page slug>", e.g. "emrickgarrett/magepop"
+#   - ITCH_GAME (variable or secret) "<itch username>/<game page slug>", e.g. "emrickgarrett/magepop"
 # The itch page must exist first (it can stay Draft/Restricted). After the very first upload, edit
 # the page once and tick "This file will be played in the browser" on the html5 upload.
 name: itch.io (browser)
@@ -23,14 +23,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-      ITCH_GAME: ${{ vars.ITCH_GAME }}
+      # Works as either a variable or a secret.
+      ITCH_GAME: ${{ vars.ITCH_GAME || secrets.ITCH_GAME }}
     steps:
       - name: Check itch.io setup
         run: |
-          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_GAME" ]; then
-            echo "::error::Add the BUTLER_API_KEY secret and ITCH_GAME variable (see the top of this file)."
-            exit 1
-          fi
+          ok=1
+          [ -n "$BUTLER_API_KEY" ] || { echo "::error::Missing the BUTLER_API_KEY repository secret."; ok=0; }
+          [ -n "$ITCH_GAME" ] || { echo "::error::Missing ITCH_GAME (a repository variable or secret, e.g. yourname/magepop)."; ok=0; }
+          [ "$ok" = 1 ] || exit 1
+          echo "Uploading to $ITCH_GAME"
 
       - uses: actions/checkout@v4
 
