@@ -2,13 +2,15 @@ import { AI_LEVELS, chapterId, chapterOpen, CHARACTERS, getCharacter, STORY, Sto
 import { achievementScore } from '../game/achievements';
 import { HowToPlay } from '../components/HowToPlay';
 import { UpdateBanner } from '../components/UpdateBanner';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Gem } from '../components/Gem';
 import { Portrait, SpellTable } from '../components/Hud';
 import { audio } from '../game/audio';
 import { isDesktop, isFullscreen, setFullscreen } from '../game/platform';
 import {
   DIFFICULTY_ORDER,
+  exportSave,
+  importSave,
   formatTime,
   goalsOn,
   mageStatsOf,
@@ -435,11 +437,13 @@ export function SettingsScreen({
   save,
   onChange,
   onReset,
+  onImport,
   onBack,
 }: {
   save: SaveData;
   onChange: (s: Settings) => void;
   onReset: () => void;
+  onImport: (s: SaveData) => void;
   onBack: () => void;
 }) {
   const st = save.settings;
@@ -486,6 +490,7 @@ export function SettingsScreen({
         </section>
         <section>
           <h4>Data</h4>
+          <SaveTransfer save={save} onImport={onImport} />
           <div className="setting">
             <div>
               <div className="setting-label">Reset progress</div>
@@ -519,6 +524,81 @@ export function SettingsScreen({
         </section>
       </div>
     </ScreenFrame>
+  );
+}
+
+/** Back up progress to a file, or load one (moving between the browser and desktop versions). */
+function SaveTransfer({ save, onImport }: { save: SaveData; onImport: (s: SaveData) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<SaveData | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([exportSave(save)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MagePop-save-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setMsg({ ok: true, text: 'Save file downloaded.' });
+  };
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      setPending(importSave(await file.text()));
+      setMsg(null);
+    } catch (e) {
+      setPending(null);
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't read that file." });
+    }
+  };
+
+  return (
+    <div className="setting">
+      <div>
+        <div className="setting-label">Save file</div>
+        <div className="setting-desc">
+          Back up your progress, or move it between the browser and desktop versions.
+          {pending && (
+            <b className="reset-done">
+              {' '}
+              Load this save? It has {pending.storyCleared.length} story fights cleared and replaces your current progress.
+            </b>
+          )}
+          {msg && <b className={msg.ok ? 'reset-done' : 'import-error'}> {msg.text}</b>}
+        </div>
+      </div>
+      <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => void pick(e.target.files?.[0]).finally(() => (e.target.value = ''))} />
+      {pending ? (
+        <div className="setting-actions">
+          <button
+            className="btn small danger"
+            onClick={() => {
+              onImport(pending);
+              setPending(null);
+              setMsg({ ok: true, text: 'Save loaded.' });
+            }}
+          >
+            Load it
+          </button>
+          <button className="btn small ghost" onClick={() => setPending(null)}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <div className="setting-actions">
+          <button className="btn small ghost" onClick={download}>
+            Export
+          </button>
+          <button className="btn small ghost" onClick={() => fileRef.current?.click()}>
+            Import…
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

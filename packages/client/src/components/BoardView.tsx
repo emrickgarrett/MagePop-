@@ -23,10 +23,14 @@ export function BoardView({ frame, engineTime, cell, interactive, onMove, stunne
   const drag = useRef<{ start: Pos; x: number; y: number; done: boolean } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Measure cells on screen rather than trusting `cell`: the browser build may zoom the page.
+  const screenCell = () => ref.current!.getBoundingClientRect().width / board.cols || cell;
+
   const cellAt = (e: React.PointerEvent): Pos | null => {
     const rect = ref.current!.getBoundingClientRect();
-    const c = Math.floor((e.clientX - rect.left) / cell);
-    const r = Math.floor((e.clientY - rect.top) / cell);
+    const size = rect.width / board.cols || cell;
+    const c = Math.floor((e.clientX - rect.left) / size);
+    const r = Math.floor((e.clientY - rect.top) / size);
     if (r < 0 || c < 0 || r >= board.rows || c >= board.cols) return null;
     return { r, c };
   };
@@ -49,7 +53,7 @@ export function BoardView({ frame, engineTime, cell, interactive, onMove, stunne
     if (!d || d.done || !interactive) return;
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
-    const th = cell * 0.35;
+    const th = screenCell() * 0.35;
     if (Math.abs(dx) < th && Math.abs(dy) < th) return;
     d.done = true;
     const to = Math.abs(dx) > Math.abs(dy) ? { r: d.start.r, c: d.start.c + Math.sign(dx) } : { r: d.start.r + Math.sign(dy), c: d.start.c };

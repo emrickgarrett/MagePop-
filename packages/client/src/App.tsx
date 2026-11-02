@@ -651,6 +651,10 @@ export function App() {
               setSave(s2);
             }}
             onReset={() => setSave(resetProgress(saveRef.current))}
+            onImport={(s2) => {
+              writeSave(s2);
+              setSave(s2);
+            }}
           />
         );
       case 'select':

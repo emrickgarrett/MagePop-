@@ -12,6 +12,8 @@ function csp(pvpServer: string): Plugin {
     // React sets inline style attributes; no inline <script> is allowed.
     "style-src 'self' file: 'unsafe-inline'",
     "img-src 'self' file: data: blob:",
+    // Vite inlines small font subsets as data: URIs.
+    "font-src 'self' file: data:",
     "media-src 'self' file: blob:",
     `connect-src 'self' file: ${pvpServer}`,
     "object-src 'none'",
@@ -36,7 +38,11 @@ export default defineConfig(({ mode, command }) => {
   return {
     base: './',
     plugins: [react(), csp(pvpServer)],
-    define: { __PVP_SERVER__: JSON.stringify(pvpServer) },
+    define: {
+      __PVP_SERVER__: JSON.stringify(pvpServer),
+      // Version label for browser builds (desktop builds ask Electron instead). Set by the itch release job.
+      __WEB_VERSION__: JSON.stringify(env.VITE_WEB_VERSION || ''),
+    },
     server: { port: 5173, strictPort: true },
   };
 });

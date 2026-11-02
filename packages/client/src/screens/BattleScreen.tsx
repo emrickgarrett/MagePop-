@@ -10,11 +10,11 @@ import { NetBattleController, pvp } from '../game/pvp';
 import type { Settings } from '../game/save';
 import { themedBoardSrc } from '../game/themes';
 import { audio } from '../game/audio';
+import { viewport } from '../game/platform';
 
 function useCellSize() {
   const calc = () => {
-    const h = window.innerHeight;
-    const w = window.innerWidth;
+    const { w, h } = viewport();
     const big = Math.max(40, Math.min(76, Math.floor((h - 290) / 8), Math.floor((w * 0.5) / 8)));
     return { big, small: Math.max(28, Math.floor(big * 0.62)) };
   };

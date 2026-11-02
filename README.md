@@ -84,9 +84,12 @@ falls back to built-in vector gems, so new mages work before their art exists.
 
 ## Audio
 
-- **Music** (Suno): `packages/client/public/assets/music/<track>.mp3`: `menu`, `story`, `endless`, `victory`,
+- **Music** (Suno): `packages/client/public/assets/music/<track>.webm`: `menu`, `story`, `endless`, `victory`,
   `defeat`, and `battle-<mageId>`. Quick Battle and story trials play your mage's theme; story bosses
   play the boss's theme. Loudness levels and loop points are set in `packages/client/src/game/audio.ts`.
+  **Music ships as WebM/Opus at 96 kbps**, about half the size of the original MP3s with no audible
+  difference. Put the original download in `art/wip/music/<track>.mp3` (git-ignored) and run
+  `python tools/process_music.py` (needs ffmpeg). Never commit the MP3/WAV originals.
 - **Sound effects**: raw packs go in `art/sfx/` (Kenney CC0 packs are there now). `python tools/process_sfx.py`
   picks, trims and levels them into `packages/client/public/assets/sfx/` and writes `manifest.json`. Any sound
   without a file (currently spell, ultimate, heal, freeze, poison, stun) is synthesized in code.
@@ -141,6 +144,15 @@ and `MagePop-<version>-portable.exe` (single file, no install). macOS builds a `
 The tag is the version: the workflow stamps it into the app, so there's nothing to bump first (the
 `version` in `apps/desktop/package.json` only matters for local builds). Installed copies update
 themselves once a release is **published**; drafts are invisible to them.
+
+**Browser version (itch.io):** the same client runs in a browser. `npm run build:web` builds it and
+writes `release/MagePop-web.zip` (index.html at the root) for a manual upload as an itch "HTML" game.
+Pushing a version tag also uploads it automatically with butler once the repo has a `BUTLER_API_KEY`
+secret and an `ITCH_GAME` variable (e.g. `yourname/magepop`); see `.github/workflows/release.yml`.
+In a browser there's no Quit button or auto-updater, fullscreen uses the browser's, and below
+1200×760 the page zooms out to fit (so any itch embed size works). Browser saves live in that
+browser only: Settings → Data → Save file exports/imports progress, also between browser and desktop.
+Always ship web and desktop from the same tag so both speak the same online protocol.
 
 **Languages:** the game is English-only, so the desktop build ships only Electron's `en-US` language
 pack (`electronLanguages` in `apps/desktop/package.json`). That saves ~8MB of Chromium translations.

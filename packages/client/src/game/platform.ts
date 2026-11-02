@@ -39,8 +39,15 @@ export async function isFullscreen(): Promise<boolean> {
   return !!document.fullscreenElement;
 }
 
-/** Corner tag label: "v1.2.3" in releases, the git branch in a local checkout. */
-export const appVersion = (): Promise<string | null> => bridge?.version?.() ?? Promise.resolve(null);
+declare const __WEB_VERSION__: string;
+const WEB_VERSION = typeof __WEB_VERSION__ === 'string' ? __WEB_VERSION__ : '';
+
+/**
+ * Corner tag label: "v1.2.3" in releases, the git branch in a local desktop checkout. Browser builds
+ * show the version they were built for (itch release job), or nothing.
+ */
+export const appVersion = (): Promise<string | null> =>
+  bridge?.version?.() ?? Promise.resolve(WEB_VERSION ? `v${WEB_VERSION.replace(/^v/, '')}` : null);
 
 export const updater = {
   get: (): Promise<UpdateState> => bridge?.update?.get() ?? Promise.resolve({ status: 'idle' }),
@@ -48,3 +55,26 @@ export const updater = {
   install: () => bridge?.update?.install(),
   openPage: () => bridge?.update?.openPage(),
 };
+
+/**
+ * Browser builds run inside whatever space the page gives them (an itch.io embed, a small laptop
+ * window). The UI is laid out for at least the desktop app's minimum window, so below that size the
+ * whole page is zoomed out to fit instead of overflowing. The desktop app never needs this.
+ */
+const MIN_W = 1200;
+const MIN_H = 760;
+
+let zoom = 1;
+
+/** The window size in the page's own CSS pixels (after the browser-build zoom above). */
+export const viewport = () => ({ w: window.innerWidth / zoom, h: window.innerHeight / zoom });
+
+export function fitToWindow() {
+  if (isDesktop) return;
+  const apply = () => {
+    zoom = Number(Math.min(1, window.innerWidth / MIN_W, window.innerHeight / MIN_H).toFixed(4));
+    document.documentElement.style.setProperty('zoom', zoom < 1 ? String(zoom) : '');
+  };
+  apply();
+  window.addEventListener('resize', apply);
+}

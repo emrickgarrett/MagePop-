@@ -170,27 +170,66 @@ export function loadSave(): SaveData {
   try {
     const raw = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY);
     if (!raw) return fresh();
-    const data = JSON.parse(raw) as Partial<SaveData>;
-    return {
-      ...fresh(),
-      ...data,
-      storyBest: data.storyBest ?? {},
-      storyStars: data.storyStars ?? {},
-      storyGoals: data.storyGoals ?? {},
-      storyGoalsBy: data.storyGoalsBy ?? legacyGoalsBy(data),
-      mageStats: data.mageStats ?? {},
-      history: data.history ?? [],
-      achievements: data.achievements ?? {},
-      // Saves from before lifetime totals existed: rebuild them from match history.
-      totals: data.totals ?? (data.history ?? []).reduceRight((t, m) => totalsWith(t, m), {} as Record<string, number>),
-      // Players from before the guide existed who've already won fights don't need it forced on them.
-      seenHowToPlay: data.seenHowToPlay ?? (data.storyCleared?.length ?? 0) > 0,
-      settings: { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) },
-      unlocked: Array.from(new Set([STARTER_CHARACTER, ...(data.unlocked ?? [])])),
-    } as SaveData;
+    return normalize(JSON.parse(raw) as Partial<SaveData>);
   } catch {
     return fresh();
   }
+}
+
+/** Fill in fields missing from older saves (and from partial imports). */
+function normalize(data: Partial<SaveData>): SaveData {
+  return {
+    ...fresh(),
+    ...data,
+    storyBest: data.storyBest ?? {},
+    storyStars: data.storyStars ?? {},
+    storyGoals: data.storyGoals ?? {},
+    storyGoalsBy: data.storyGoalsBy ?? legacyGoalsBy(data),
+    mageStats: data.mageStats ?? {},
+    history: data.history ?? [],
+    achievements: data.achievements ?? {},
+    // Saves from before lifetime totals existed: rebuild them from match history.
+    totals: data.totals ?? (data.history ?? []).reduceRight((t, m) => totalsWith(t, m), {} as Record<string, number>),
+    // Players from before the guide existed who've already won fights don't need it forced on them.
+    seenHowToPlay: data.seenHowToPlay ?? (data.storyCleared?.length ?? 0) > 0,
+    settings: { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) },
+    unlocked: Array.from(new Set([STARTER_CHARACTER, ...(data.unlocked ?? [])])),
+  } as SaveData;
+}
+
+// ---- backup / transfer ----------------------------------------------------------------------
+// Browser saves can be wiped (private windows, cleared site data, Safari's 7-day rule for embedded
+// games), and the desktop and browser versions keep separate saves. A save file lets players back
+// up their progress and move it between them.
+
+const EXPORT_TAG = 'magepop-save';
+const MAX_IMPORT_CHARS = 2_000_000;
+
+export function exportSave(s: SaveData): string {
+  return JSON.stringify({ game: EXPORT_TAG, format: 1, exportedAt: new Date().toISOString(), save: s });
+}
+
+/** Parse a save file. Throws an Error with a player-facing message if it isn't one. */
+export function importSave(text: string): SaveData {
+  const notASave = "That file isn't a MagePop save.";
+  if (text.length > MAX_IMPORT_CHARS) throw new Error(notASave);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(notASave);
+  }
+  const wrap = parsed as { game?: unknown; save?: unknown } | null;
+  if (!wrap || typeof wrap !== 'object' || wrap.game !== EXPORT_TAG) throw new Error(notASave);
+  const data = wrap.save;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('That save file is damaged.');
+  // Light shape checks so a bad file can't break the menus.
+  const lists = ['unlocked', 'storyCleared', 'history'] as const;
+  for (const k of lists) {
+    const v = (data as Record<string, unknown>)[k];
+    if (v !== undefined && !Array.isArray(v)) throw new Error('That save file is damaged.');
+  }
+  return normalize(data as Partial<SaveData>);
 }
 
 export function writeSave(s: SaveData) {

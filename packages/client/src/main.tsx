@@ -6,8 +6,10 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { preloadThemes } from './game/themes';
 import { audio } from './game/audio';
+import { fitToWindow } from './game/platform';
 import './styles.css';
 
+fitToWindow();
 preloadThemes();
 audio.init();
 // UI click sound for every button.

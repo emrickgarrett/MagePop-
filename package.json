@@ -16,7 +16,8 @@
     "typecheck": "tsc -p packages/core && tsc -p packages/client && tsc -p packages/server",
     "server": "npm run start -w @magepop/server",
     "sim": "npm run sim -w @magepop/core",
-    "dist": "npm run dist -w @magepop/desktop"
+    "dist": "npm run dist -w @magepop/desktop",
+    "build:web": "npm run build -w @magepop/client && node tools/zip-web.mjs"
   },
   "engines": {
     "node": ">=22.12"
