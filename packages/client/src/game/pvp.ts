@@ -166,6 +166,16 @@ export class PvpLink {
   }
 
   /** Connect (if needed) and say hello. Resolves once the server welcomes us. */
+  /**
+   * The server sleeps when nobody is online and takes a few seconds to wake. Opening the lobby pokes
+   * its health check so it's usually awake by the time the player clicks anything.
+   */
+  wake() {
+    if (this.ws) return;
+    const http = this.url.replace(/^ws(s?):/, 'http$1:').replace(/\/$/, '');
+    fetch(`${http}/health`, { mode: 'no-cors', cache: 'no-store' }).catch(() => {});
+  }
+
   connect(name: string): Promise<void> {
     this.name = sanitizeName(name);
     if (this.ws && (this.status === 'ready' || this.status === 'queued' || this.status === 'hosting')) return Promise.resolve();

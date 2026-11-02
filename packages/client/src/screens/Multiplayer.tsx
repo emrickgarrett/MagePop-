@@ -7,6 +7,33 @@ import { ScreenFrame } from './Menus';
 
 type MatchFound = Extract<ServerMessage, { t: 'matchFound' }>;
 
+/**
+ * Copy text, falling back to the old select-and-copy trick where the Clipboard API is blocked
+ * (some browsers inside embedded pages like itch.io's game frame).
+ */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+    ta.remove();
+    return ok;
+  }
+}
+
 const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
 
 /**
@@ -32,7 +59,12 @@ export function MultiplayerLobby({
     save.settings.pvpMage && save.unlocked.includes(save.settings.pvpMage) ? save.settings.pvpMage : save.unlocked[0],
   );
   const [code, setCode] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'yes' | 'no' | null>(null);
+  /** Which Friend Battle button is waiting on the server (connecting, then creating/joining). */
+  const [friendPending, setFriendPending] = useState<'create' | 'join' | null>(null);
+  const [pendingSince, setPendingSince] = useState(0);
+  const pendingRef = useRef(friendPending);
+  pendingRef.current = friendPending;
   const [, bump] = useState(0);
   const [searchStart, setSearchStart] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -45,6 +77,7 @@ export function MultiplayerLobby({
       if (m.t === 'matchFound') onMatchRef.current(m);
     });
     const tick = setInterval(() => setNow(Date.now()), 500);
+    pvp.wake();
     return () => {
       offStatus();
       offMsg();
@@ -54,6 +87,10 @@ export function MultiplayerLobby({
 
   const cleanName = sanitizeName(name);
   const status = pvp.status;
+  // The server answered (room made, match found, or an error): stop showing "connecting".
+  useEffect(() => {
+    if (friendPending && (status === 'hosting' || status === 'inMatch' || status === 'closed' || (status === 'ready' && pvp.error))) setFriendPending(null);
+  }, [status, friendPending, pvp.error]); // eslint-disable-line react-hooks/exhaustive-deps
   const searching = status === 'queued' || (status === 'connecting' && searchStart !== null);
   const hosting = status === 'hosting';
   const busy = searching || hosting || status === 'connecting';
@@ -79,22 +116,29 @@ export function MultiplayerLobby({
     setSearchStart(null);
   };
   const createRoom = async () => {
-    setCopied(false);
-    if (await ready()) pvp.createRoom(mage);
+    setCopied(null);
+    setFriendPending('create');
+    pendingRef.current = 'create';
+    setPendingSince(Date.now());
+    const ok = await ready();
+    if (pendingRef.current !== 'create') return; // cancelled while connecting
+    if (ok) pvp.createRoom(mage);
+    else setFriendPending(null);
   };
   const joinRoom = async () => {
     const c = normalizeRoomCode(code);
     if (!c) return;
-    if (await ready()) pvp.joinRoom(c, mage);
+    setFriendPending('join');
+    pendingRef.current = 'join';
+    setPendingSince(Date.now());
+    const ok = await ready();
+    if (pendingRef.current !== 'join') return; // cancelled while connecting
+    if (ok) pvp.joinRoom(c, mage);
+    else setFriendPending(null);
   };
   const copyCode = async () => {
     if (!pvp.roomCode) return;
-    try {
-      await navigator.clipboard.writeText(pvp.roomCode);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
+    setCopied((await copyText(pvp.roomCode)) ? 'yes' : 'no');
   };
 
   // "Rematch" after a Quick Match lands here and searches again right away.
@@ -178,25 +222,52 @@ export function MultiplayerLobby({
             {hosting && pvp.roomCode ? (
               <>
                 <p className="muted">Send this code to your friend. The match starts as soon as they join.</p>
-                <div className="room-code">
+                <button className="room-code" onClick={copyCode} title="Click to copy" aria-label={`Room code ${pvp.roomCode}. Click to copy.`}>
                   {pvp.roomCode.split('').map((ch, i) => (
                     <span key={i}>{ch}</span>
                   ))}
-                </div>
+                </button>
+                {copied === 'yes' && <p className="room-copied">Copied! Paste it to your friend.</p>}
+                {copied === 'no' && (
+                  <p className="room-copied">
+                    Couldn't copy automatically. Your code is <b className="selectable">{pvp.roomCode}</b>
+                  </p>
+                )}
                 <div className="mp-search">
                   <div className="mp-spinner" />
                   <div>
                     <b>Waiting for your friend…</b>
                     <small className="muted">Code expires in {mmss(roomLeft)}</small>
                   </div>
-                  <button className="btn small ghost" onClick={copyCode}>
-                    {copied ? 'Copied!' : 'Copy code'}
+                  <button className="btn small" onClick={copyCode}>
+                    {copied === 'yes' ? 'Copied!' : 'Copy code'}
                   </button>
                   <button className="btn small ghost" onClick={() => pvp.closeRoom()}>
                     Cancel
                   </button>
                 </div>
               </>
+            ) : friendPending ? (
+              <div className="mp-search">
+                <div className="mp-spinner" />
+                <div>
+                  <b>
+                    {status === 'connecting' ? 'Connecting to the server…' : friendPending === 'create' ? 'Creating your room…' : 'Joining the room…'}
+                  </b>
+                  <small className="muted">
+                    {now - pendingSince > 3000 ? 'Waking up the server. This can take up to 20 seconds.' : 'One moment.'}
+                  </small>
+                </div>
+                <button
+                  className="btn small ghost"
+                  onClick={() => {
+                    setFriendPending(null);
+                    pendingRef.current = null;
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             ) : (
               <>
                 <p className="muted">Play someone you know: make a room and share the code, or enter theirs.</p>

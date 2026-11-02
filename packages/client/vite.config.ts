@@ -15,7 +15,8 @@ function csp(pvpServer: string): Plugin {
     // Vite inlines small font subsets as data: URIs.
     "font-src 'self' file: data:",
     "media-src 'self' file: blob:",
-    `connect-src 'self' file: ${pvpServer}`,
+    // The WebSocket, plus the same host over http(s) for the lobby's wake-up ping.
+    `connect-src 'self' file: ${pvpServer} ${pvpServer.replace(/^ws(s?):/, 'http$1:')}`,
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",

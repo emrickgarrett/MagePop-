@@ -2796,7 +2796,25 @@ small {
   display: flex;
   justify-content: center;
   gap: 8px;
-  margin: 4px 0;
+  margin: 4px auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.room-code:hover span {
+  border-color: var(--accent);
+}
+.room-copied {
+  margin: 0;
+  text-align: center;
+  color: var(--gold);
+  font-weight: 700;
+}
+.selectable {
+  user-select: all;
+  letter-spacing: 0.15em;
 }
 .room-code span {
   width: 52px;
