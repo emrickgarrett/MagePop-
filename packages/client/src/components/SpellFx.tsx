@@ -92,11 +92,13 @@ export function SpellFxLayer({
 }) {
   if (!vfx.length || !root.current) return <div className="spellfx-layer" />;
   const base = root.current.getBoundingClientRect();
+  // Rects come back in screen pixels; effects are placed in the page's own CSS pixels. They differ
+  // when the browser build zooms the page to fit (phones on their side, small itch.io embeds).
+  const z = base.width / (root.current.offsetWidth || base.width) || 1;
+  const local = (r: DOMRect): Rect => ({ x: (r.left - base.left) / z, y: (r.top - base.top) / z, w: r.width / z, h: r.height / z });
   const rectOf = (p: PlayerIndex): Rect | null => {
     const el = boards[p].current;
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+    return el ? local(el.getBoundingClientRect()) : null;
   };
   const rects: [Rect | null, Rect | null] = [rectOf(0), rectOf(1)];
   const t0 = (v: Vfx) => clamp01((now - v.born) / v.duration);
@@ -105,8 +107,8 @@ export function SpellFxLayer({
   const stageRect = (() => {
     const el = stage?.current;
     if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return r.height > 60 ? { x: r.left - base.left, y: r.top - base.top, w: r.width, h: Math.min(r.height, 280) } : null;
+    const r = local(el.getBoundingClientRect());
+    return r.h > 60 ? { ...r, h: Math.min(r.h, 280) } : null;
   })();
 
   return (
