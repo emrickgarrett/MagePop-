@@ -1,0 +1,57 @@
+# Uploads the browser version of MagePop! to itch.io ("play in browser"), so nobody uploads by hand.
+#
+# Runs on every version tag (same trigger as the desktop Release workflow), and can be started by
+# hand from the Actions tab ("Run workflow") to push the current branch for testing.
+#
+# One-time setup (repo Settings → Secrets and variables → Actions):
+#   - secret   BUTLER_API_KEY  an itch.io API key (itch.io → Settings → API keys). Never in the repo.
+#   - variable ITCH_GAME       "<itch username>/<game page slug>", e.g. "emrickgarrett/magepop"
+# The itch page must exist first (it can stay Draft/Restricted). After the very first upload, edit
+# the page once and tick "This file will be played in the browser" on the html5 upload.
+name: itch.io (browser)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push-web:
+    runs-on: ubuntu-latest
+    env:
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      ITCH_GAME: ${{ vars.ITCH_GAME }}
+    steps:
+      - name: Check itch.io setup
+        run: |
+          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_GAME" ]; then
+            echo "::error::Add the BUTLER_API_KEY secret and ITCH_GAME variable (see the top of this file)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Pick the version label
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="${GITHUB_REF_NAME#v}"; else V="${GITHUB_REF_NAME}-$(git rev-parse --short HEAD)"; fi
+          echo "WEB_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Uploading browser build $V"
+
+      - name: Build the browser version
+        run: |
+          npm install
+          npm test
+          VITE_WEB_VERSION="$WEB_VERSION" npm run build -w @magepop/client
+
+      - name: Upload to itch.io with butler
+        run: |
+          curl -sSfL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler && chmod +x butler/butler
+          ./butler/butler push packages/client/dist "$ITCH_GAME:html5" --userversion "$WEB_VERSION"

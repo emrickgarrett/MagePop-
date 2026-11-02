@@ -148,7 +148,7 @@ themselves once a release is **published**; drafts are invisible to them.
 **Browser version (itch.io):** the same client runs in a browser. `npm run build:web` builds it and
 writes `release/MagePop-web.zip` (index.html at the root) for a manual upload as an itch "HTML" game.
 Pushing a version tag also uploads it automatically with butler once the repo has a `BUTLER_API_KEY`
-secret and an `ITCH_GAME` variable (e.g. `yourname/magepop`); see `.github/workflows/release.yml`.
+secret and an `ITCH_GAME` variable (e.g. `yourname/magepop`); see `.github/workflows/itch-web.yml`; it can also be run by hand from the Actions tab.
 In a browser there's no Quit button or auto-updater, fullscreen uses the browser's, and below
 1200×760 the page zooms out to fit (so any itch embed size works). Browser saves live in that
 browser only: Settings → Data → Save file exports/imports progress, also between browser and desktop.
