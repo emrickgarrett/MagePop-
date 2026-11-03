@@ -70,7 +70,14 @@ EXPRESSIONS = {
 # Story chapter maps (the Chapter screen draws stages and trails on top), keyed by chapter id.
 MAPS = {
     "ember": "Story_map_CHAPTER_1_Academy_grounds_spring._A_full_e93e1fe2-1875-4a6c-8929-34dab77b028e.jpg",
+    "rime": "Story_map_CHAPTER_2_Academy_grounds_deep_winter._A_097a73cb-f958-4532-97d3-121eaccad63b.jpg",
+    "briar": "Story_map_CHAPTER_3_Academy_grounds_blighted_grove_56a7ab74-1ba8-4220-891d-df5341c554e8.jpg",
+    "nyx": "Story_map_CHAPTER_4_Academy_grounds_night_catacomb_524c8627-229f-4b88-a83b-6b963788852a.jpg",
+    "volt": "Story_map_CHAPTER_5_Academy_grounds_thunderstorm._67dd398e-7293-43d2-8a01-7bc436e0dd4c.jpg",
+    "finale": "Story_map_FINALE_The_Fracture_beneath_the_Academy._fa0f94d7-c1a0-449b-8e40-ecedcd09e592.jpg",
 }
+# (contrast, brightness) per map: the daylight maps come out washed-out and need pulling down.
+MAP_TONE = {"ember": (1.08, 0.9), "rime": (1.15, 0.82), "briar": (1.1, 0.86)}
 
 # Manual crops (fractions of the source) for images the generator framed with a fake
 # "transparency" checkerboard that the automatic trim can't see.
@@ -122,7 +129,8 @@ def main():
         img = Image.open(find(name)).convert("RGB")
         img = cover(trim_frame(img), MAP_SIZE)
         # The generator tends to blow out highlights; pull them back so gold markers stand out.
-        img = ImageEnhance.Brightness(ImageEnhance.Contrast(img).enhance(1.08)).enhance(0.9)
+        contrast, brightness = MAP_TONE.get(mid, (1.04, 1.0))
+        img = ImageEnhance.Brightness(ImageEnhance.Contrast(img).enhance(contrast)).enhance(brightness)
         img.save(OUT_MAPS / f"{mid}.jpg", quality=82, optimize=True, progressive=True)
         print(f"map {mid}")
     for eid, name in EXPRESSIONS.items():

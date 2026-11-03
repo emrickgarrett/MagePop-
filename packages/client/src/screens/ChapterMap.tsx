@@ -19,6 +19,49 @@ const MAP_LAYOUTS: Record<string, Record<string, [number, number]>> = {
     'ember-glass-cannon': [67, 60],
     'ember-boss': [81, 57],
   },
+  // Deep winter: fountain plaza → arena → frosted greenhouse → pine grove (frozen pond on the side).
+  rime: {
+    'rime-cold-equation': [87, 46],
+    'rime-mirror': [79, 60],
+    'rime-thaw': [50, 50],
+    'rime-echo-hunt': [15, 52],
+    'rime-frostbitten': [27, 22],
+    'rime-boss': [8, 22],
+  },
+  // The blight spreads from the grove: heart-tree → grove edge → gray avenue → library tower.
+  briar: {
+    'briar-deep-roots': [17, 47],
+    'briar-sapling': [30, 53],
+    'briar-blight': [43, 67],
+    'briar-ashes': [26, 30],
+    'briar-withered': [40, 39],
+    'briar-boss': [8, 22],
+  },
+  // Night: library → graveyard → stairs → catacomb door, then across the grounds to the dorms.
+  nyx: {
+    'nyx-venom-and-burst': [10, 24],
+    'nyx-the-hunt': [15, 38],
+    'nyx-hex-trial': [22, 51],
+    'nyx-turned-curse': [13, 62],
+    'nyx-quick-venom': [42, 74],
+    'nyx-boss': [91, 68],
+  },
+  // The storm: dorms → observatory → hedge garden → arena, and down into the crack.
+  volt: {
+    'volt-overcharge': [90, 27],
+    'volt-ambush': [9, 22],
+    'volt-drained': [24, 42],
+    'volt-recharge': [45, 54],
+    'volt-nightmare-echo': [82, 57],
+    'volt-boss': [66, 37],
+  },
+  // Beneath the Academy: down the stairs → the gray garden → the Heartstone (rematch on a far ledge).
+  finale: {
+    'finale-fracture': [26, 42],
+    'finale-gray-garden': [13, 64],
+    'finale-boss': [78, 60],
+    'finale-colorless': [72, 28],
+  },
 };
 
 /** Art per chapter in public/assets/maps/<chapterId>.jpg; a location scene stands in until it exists. */
