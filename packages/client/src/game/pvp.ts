@@ -131,6 +131,8 @@ export class PvpLink {
   error: string | null = null;
   /** The friend-room code we're hosting, while waiting for a friend. */
   roomCode: string | null = null;
+  /** When we joined the Quick Match queue (survives leaving the lobby to play a bot while waiting). */
+  queuedAt: number | null = null;
   roomExpiresAt = 0;
   /** Latest friend-rematch status (the result screen appears after the server sends it). */
   rematchStatus: 'available' | 'opponentWants' | 'waiting' | 'cancelled' | null = null;
@@ -259,6 +261,7 @@ export class PvpLink {
         break;
       }
       case 'matchFound':
+        this.queuedAt = null;
         this.chatMuted = false;
         this.resumeToken = msg.resumeToken;
         this.roomCode = null;
@@ -320,6 +323,7 @@ export class PvpLink {
   }
 
   queue(characterId: string) {
+    this.queuedAt = Date.now();
     this.send({ t: 'queue', characterId });
   }
 
@@ -362,6 +366,7 @@ export class PvpLink {
   }
 
   cancelQueue() {
+    this.queuedAt = null;
     this.send({ t: 'cancelQueue' });
     if (this.status === 'queued') this.setStatus('ready', null);
   }

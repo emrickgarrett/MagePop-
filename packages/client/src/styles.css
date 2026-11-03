@@ -5304,3 +5304,47 @@ html.vertical .strip-arrow {
     animation: none;
   }
 }
+
+/* Quick Match: offer a bot game while the queue is empty */
+.mp-wait-bot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: rgba(16, 9, 32, 0.7);
+  box-shadow: inset 0 0 0 1px var(--gold-line);
+  animation: update-pop 0.35s ease-out;
+}
+.mp-wait-bot p {
+  margin: 0;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--parch) 85%, transparent);
+}
+.mp-wait-bot b {
+  color: var(--parch);
+}
+.mp-wait-bot .btn {
+  align-self: flex-start;
+}
+/* "A real opponent was found!" when a bot game gets cut short */
+.match-notice {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 150;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #2a1405;
+  background: linear-gradient(180deg, #fff2c6, #e2b85a 60%, #b07a24);
+  box-shadow:
+    0 0 0 2px #3a2208,
+    0 0 26px rgba(226, 184, 90, 0.6),
+    0 10px 24px rgba(0, 0, 0, 0.45);
+  animation: update-pop 0.35s ease-out;
+}

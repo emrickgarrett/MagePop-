@@ -34,6 +34,9 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
+/** How long Quick Match waits before offering a bot game in the meantime. */
+const WAIT_BOT_AFTER_S = 25;
+
 const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.max(0, sec) % 60).padStart(2, '0')}`;
 
 /**
@@ -46,6 +49,7 @@ export function MultiplayerLobby({
   onBack,
   onSettings,
   onMatch,
+  onWaitBot,
 }: {
   save: SaveData;
   /** Queue immediately (coming back from "Rematch" after a Quick Match). */
@@ -53,6 +57,8 @@ export function MultiplayerLobby({
   onBack: () => void;
   onSettings: (s: Settings) => void;
   onMatch: (found: MatchFound) => void;
+  /** Play a bot while staying in the Quick Match queue. */
+  onWaitBot: (mage: string) => void;
 }) {
   const [name, setName] = useState(save.settings.playerName);
   const [mage, setMage] = useState(
@@ -158,7 +164,8 @@ export function MultiplayerLobby({
   };
 
   const ch = getCharacter(mage);
-  const waited = searchStart ? Math.floor((now - searchStart) / 1000) : 0;
+  const queuedSince = searchStart ?? pvp.queuedAt;
+  const waited = queuedSince ? Math.max(0, Math.floor((now - queuedSince) / 1000)) : 0;
   const roomLeft = Math.ceil((pvp.roomExpiresAt - now) / 1000);
   const codeOk = normalizeRoomCode(code) !== null;
 
@@ -209,7 +216,19 @@ export function MultiplayerLobby({
                   Cancel
                 </button>
               </div>
-            ) : (
+            ) : null}
+            {searching && status === 'queued' && waited >= WAIT_BOT_AFTER_S && (
+              <div className="mp-wait-bot">
+                <p>
+                  <b>No one&apos;s around right now.</b> Play a bot while you wait? You stay in the queue, and if someone joins you&apos;ll
+                  jump straight into the real match.
+                </p>
+                <button className="btn" onClick={() => onWaitBot(mage)}>
+                  Play a bot while I wait
+                </button>
+              </div>
+            )}
+            {!searching && (
               <button className="btn big" disabled={busy} onClick={findMatch}>
                 Find Match
                 <small>as {ch.name}</small>

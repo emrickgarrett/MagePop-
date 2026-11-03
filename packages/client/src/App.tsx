@@ -67,6 +67,8 @@ type Screen =
       opponentTag?: string;
       /** Story: the scene's location painted behind the battle. */
       backdrop?: string;
+      /** A bot game played while still queued for Quick Match (a real match can cut in). */
+      whileQueued?: boolean;
       onEnd: (r: BattleResult) => void;
       music: MusicTrack;
     }
@@ -153,6 +155,11 @@ export function App() {
     setSaveState(s);
   };
   const [screen, setScreen] = useState<Screen>({ name: 'menu' });
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
+  /** True while the player is in a "bot while you wait" game (or its results) and still queued. */
+  const waitingRef = useRef(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   /** Stamp any newly earned achievements into the save, queue their toasts and save to disk. */
@@ -180,6 +187,23 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [save]);
   const menu = () => setScreen({ name: 'menu' });
+
+  // A real Quick Match opponent turned up during a "bot while you wait" game: switch to it.
+  // (In the lobby itself the lobby handles matchFound.)
+  useEffect(() => {
+    const off = pvp.on((m) => {
+      if (m.t !== 'matchFound' || !waitingRef.current || screenRef.current.name === 'pvp') return;
+      waitingRef.current = false;
+      setNotice('A real opponent was found! Switching to your online match…');
+      playOnlineRef.current(m);
+    });
+    return () => void off();
+  }, []);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(t);
+  }, [notice]);
 
   useEffect(() => {
     audio.setVolumes(save.settings.musicVolume, save.settings.sfxVolume);
@@ -436,8 +460,55 @@ export function App() {
       },
     });
   };
+  const playOnlineRef = useRef(playOnline);
+  playOnlineRef.current = playOnline;
 
   // ---- Quick --------------------------------------------------------------
+  /**
+   * Quick Match found nobody: play a bot (Apprentice, random mage) while staying in the queue.
+   * If a real opponent turns up mid-game, the bot game is dropped (not recorded) and the online
+   * match starts; see the matchFound listener below.
+   */
+  const playWhileQueued = (player: string) => {
+    waitingRef.current = true;
+    const pool = CHARACTERS.filter((c) => c.id !== player);
+    const opponent = pool[Math.floor(Math.random() * pool.length)].id;
+    const lvl = aiLevel(1);
+    const backToQueue = { label: 'Back to the queue', primary: true, onClick: () => setScreen({ name: 'pvp' }) };
+    setScreen({
+      name: 'battle',
+      setup: { seed: newSeed(), player, opponent, aiLevel: lvl },
+      header: `While you wait · vs ${getCharacter(opponent).name} (${lvl.name}) · still searching…`,
+      mode: 'quick',
+      detail: 'Quick Battle',
+      music: battleTheme(player),
+      whileQueued: true,
+      onEnd: (r) =>
+        setScreen({
+          name: 'result',
+          info: {
+            won: r.won,
+            title: r.won ? 'Victory!' : 'Defeated',
+            subtitle: "You're still in the queue for Quick Match.",
+            stats: statsOf(r),
+            actions: [
+              backToQueue,
+              { label: 'Another bot', onClick: () => playWhileQueued(player) },
+              {
+                label: 'Leave the queue',
+                onClick: () => {
+                  waitingRef.current = false;
+                  pvp.cancelQueue();
+                  pvp.close();
+                  menu();
+                },
+              },
+            ],
+          },
+        }),
+    });
+  };
+
   const playQuick = (player: string, opponent: string, level: number) => {
     const lvl = aiLevel(level);
     setScreen({
@@ -555,6 +626,7 @@ export function App() {
     <>
       {renderScreen()}
       <RotateHint />
+      {notice && <div className="match-notice">{notice}</div>}
       <AchievementToasts toasts={toasts} onDone={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
     </>
   );
@@ -627,6 +699,7 @@ export function App() {
             save={save}
             autoQueue={screen.autoQueue}
             onBack={() => {
+              waitingRef.current = false;
               pvp.close();
               menu();
             }}
@@ -635,7 +708,11 @@ export function App() {
               writeSave(s2);
               setSave(s2);
             }}
-            onMatch={playOnline}
+            onMatch={(m) => {
+              waitingRef.current = false;
+              playOnline(m);
+            }}
+            onWaitBot={playWhileQueued}
           />
         );
       case 'history':
@@ -708,7 +785,9 @@ export function App() {
               setSave(unlockAchievements(addHistory(s2, rec), [rec]));
               // Leaving an online match for the menu: hang up (the forfeit has already been sent).
               if (screen.mode === 'pvp') pvp.close();
-              menu();
+              // Forfeiting a bot game played while queued goes back to the (still running) search.
+              if (screen.whileQueued) setScreen({ name: 'pvp' });
+              else menu();
             }}
           />
         );
