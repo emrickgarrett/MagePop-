@@ -8,7 +8,18 @@ import { Portrait } from '../components/Hud';
  */
 
 /** Stage positions in percent of the map (x across, y down). Missing chapters fall back to an auto layout. */
-const MAP_LAYOUTS: Record<string, Record<string, [number, number]>> = {};
+const MAP_LAYOUTS: Record<string, Record<string, [number, number]>> = {
+  // Spring on the Academy grounds: gate → arena → Heartstone Hall → dorms → arena → fountain.
+  ember: {
+    'ember-first-spark': [21, 73],
+    'ember-trial': [42, 60],
+    'ember-wild-magic': [63, 25],
+    'ember-hold-the-line': [88, 25],
+    'ember-first-echo': [55, 46],
+    'ember-glass-cannon': [67, 60],
+    'ember-boss': [81, 57],
+  },
+};
 
 /** Art per chapter in public/assets/maps/<chapterId>.jpg; a location scene stands in until it exists. */
 const FALLBACK_SCENE: Record<string, string> = {

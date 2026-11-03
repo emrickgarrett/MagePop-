@@ -4946,3 +4946,229 @@ html.vertical .cm-hero {
   font-size: 22px;
   margin: 0;
 }
+
+/* ---- academy buttons: gilded primaries, dark-glass secondaries ---- */
+.btn {
+  position: relative;
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #2a1405;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fff2c6 0%, #f2cd6e 34%, #cf9431 70%, #9c6619 100%);
+  text-shadow: 0 1px 0 rgba(255, 244, 210, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 0 rgba(90, 50, 10, 0.45),
+    0 0 0 2px #3a2208,
+    0 0 0 3px rgba(226, 184, 90, 0.55),
+    0 4px 0 1px #4a2c0b,
+    0 10px 22px rgba(0, 0, 0, 0.45);
+}
+.btn:hover {
+  filter: brightness(1.08) saturate(1.05);
+}
+.btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(90, 50, 10, 0.45),
+    0 0 0 2px #3a2208,
+    0 0 0 3px rgba(226, 184, 90, 0.55),
+    0 1px 0 1px #4a2c0b,
+    0 5px 12px rgba(0, 0, 0, 0.4);
+}
+/* gold diamonds on the ends of full-size primary buttons */
+.btn:not(.small):not(.ghost):not(.mid)::before,
+.btn:not(.small):not(.ghost):not(.mid)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  background: linear-gradient(135deg, var(--gold-hi), var(--gold) 50%, var(--gold-lo));
+  box-shadow: 0 0 0 2px #3a2208;
+  transform: translateY(-50%) rotate(45deg);
+  pointer-events: none;
+}
+.btn:not(.small):not(.ghost):not(.mid)::before {
+  left: -5px;
+}
+.btn:not(.small):not(.ghost):not(.mid)::after {
+  right: -5px;
+}
+
+.btn.ghost {
+  color: var(--parch);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  background: linear-gradient(180deg, rgba(44, 24, 78, 0.9), rgba(18, 10, 36, 0.92));
+  box-shadow:
+    inset 0 0 0 1px var(--gold-line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.btn.ghost:hover {
+  filter: none;
+  box-shadow:
+    inset 0 0 0 1px var(--gold-hi),
+    0 0 14px rgba(226, 184, 90, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.btn.ghost:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 0 0 1px var(--gold-line);
+}
+.btn.ghost.on,
+.btn.ghost[aria-pressed='true'] {
+  color: #2a1405;
+  text-shadow: none;
+  background: linear-gradient(180deg, #fff2c6, #e2b85a 60%, #b07a24);
+}
+.btn.small {
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+.btn.danger {
+  color: var(--parch);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  background: linear-gradient(180deg, #e0476a, #9e1f3a 60%, #5c0a26);
+}
+.btn.big small {
+  font-family: var(--body);
+  letter-spacing: 0;
+  color: #5a3410;
+  text-shadow: none;
+}
+.btn.alt,
+.btn.alt2,
+.btn.alt3 {
+  color: var(--parch);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+}
+.btn.alt {
+  background: linear-gradient(180deg, #f0708f, #b8264a 55%, #6e0f2b);
+}
+.btn.alt2 {
+  background: linear-gradient(180deg, #6fb2ff, #2a63c8 55%, #12306e);
+}
+.btn.alt3 {
+  background: linear-gradient(180deg, #c99bff, #7a3fd0 55%, #3f1786);
+}
+.btn.alt small,
+.btn.alt2 small,
+.btn.alt3 small {
+  color: color-mix(in srgb, var(--parch) 80%, transparent);
+}
+.btn:disabled,
+.btn.disabled {
+  filter: grayscale(0.85) brightness(0.55);
+}
+
+/* segmented toggles and pills: dark glass, gold when chosen */
+.seg {
+  border-radius: 8px;
+  background: rgba(16, 9, 32, 0.8);
+  box-shadow: inset 0 0 0 1px var(--gold-line);
+}
+.seg-btn {
+  border-radius: 5px;
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--parch) 70%, transparent);
+}
+.seg-btn.on {
+  color: #2a1405;
+  background: linear-gradient(180deg, #fff2c6, #e2b85a 60%, #b07a24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.pill {
+  border-radius: 6px;
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--parch);
+  background: rgba(16, 9, 32, 0.8);
+  border: 1px solid rgba(226, 184, 90, 0.45);
+}
+.pill.on {
+  color: #2a1405;
+  background: linear-gradient(180deg, #fff2c6, #e2b85a 60%, #b07a24);
+  border-color: var(--gold-hi);
+  box-shadow: 0 0 14px rgba(226, 184, 90, 0.45);
+}
+
+/* ---- academy panels: dark glass with a gold hairline, serif headings ---- */
+.mp-panel,
+.settings section,
+.char-detail,
+.modal,
+.history-summary,
+.rewards-head,
+.reward-card,
+.ach-card,
+.story-summary,
+.puzzle-goal,
+.player-panel {
+  border-radius: 12px;
+  border: 0;
+  background: linear-gradient(180deg, rgba(40, 22, 72, 0.88), rgba(16, 9, 32, 0.92));
+  box-shadow:
+    inset 0 0 0 1px var(--gold-line),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 22px rgba(0, 0, 0, 0.35);
+}
+.player-panel {
+  background:
+    radial-gradient(ellipse 60% 120% at 0% 50%, color-mix(in srgb, var(--accent, #a659ff) 20%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(40, 22, 72, 0.9), rgba(16, 9, 32, 0.92));
+}
+.modal {
+  box-shadow:
+    inset 0 0 0 2px var(--gold),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 5px rgba(226, 184, 90, 0.3),
+    0 20px 50px rgba(0, 0, 0, 0.6);
+}
+.mp-panel h3,
+.modal h2,
+.char-detail h2,
+.char-detail h3,
+.settings h4,
+.rewards-head .rh-stars,
+.result-title {
+  font-family: var(--serif);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--parch);
+}
+.settings h4 {
+  color: var(--gold);
+  letter-spacing: 0.18em;
+}
+.char-card {
+  border-radius: 10px;
+  border: 0;
+  background: linear-gradient(180deg, rgba(40, 22, 72, 0.85), rgba(16, 9, 32, 0.9));
+  box-shadow: inset 0 0 0 1px rgba(226, 184, 90, 0.3);
+  font-family: var(--serif);
+  font-weight: 600;
+  color: var(--parch);
+}
+.char-card.picked {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(226, 184, 90, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(48, 26, 86, 0.95), rgba(20, 11, 40, 0.95));
+  box-shadow:
+    inset 0 0 0 2px var(--gold),
+    0 0 16px rgba(226, 184, 90, 0.35);
+}
+.switch.on {
+  background: linear-gradient(180deg, #f2cd6e, #b07a24);
+}
+.chapter-tab,
+.legend-row,
+.node-card {
+  border-radius: 10px;
+}

@@ -12,11 +12,12 @@ Edit SCENES / EXPRESSIONS when you regenerate art.
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC_DIRS = [ROOT / "art" / "assets" / "sprites", ROOT / "art" / "wip" / "story-src"]
 OUT_SCENES = ROOT / "packages" / "client" / "public" / "assets" / "scenes"
+OUT_MAPS = ROOT / "packages" / "client" / "public" / "assets" / "maps"
 OUT_EXPR = ROOT / "packages" / "client" / "public" / "assets" / "portraits" / "expr"
 
 SCENES = {
@@ -66,11 +67,17 @@ EXPRESSIONS = {
     "hollow-sad": "Hollow_expression_SAD._Head-and-shoulders_portrait_8825a10e-e17f-45a2-b2d1-e3e0914519dd.png",
 }
 
+# Story chapter maps (the Chapter screen draws stages and trails on top), keyed by chapter id.
+MAPS = {
+    "ember": "Story_map_CHAPTER_1_Academy_grounds_spring._A_full_e93e1fe2-1875-4a6c-8929-34dab77b028e.jpg",
+}
+
 # Manual crops (fractions of the source) for images the generator framed with a fake
 # "transparency" checkerboard that the automatic trim can't see.
 SCENE_CROPS = {"heartstone": (0.07, 0.056, 0.928, 0.95)}
 
 SCENE_SIZE = (1600, 900)
+MAP_SIZE = (1600, 1000)
 PORTRAIT_SIZE = 768
 
 
@@ -110,6 +117,14 @@ def main():
         img = cover(trim_frame(img), SCENE_SIZE)
         img.save(OUT_SCENES / f"{sid}.jpg", quality=82, optimize=True, progressive=True)
         print(f"scene {sid}")
+    OUT_MAPS.mkdir(parents=True, exist_ok=True)
+    for mid, name in MAPS.items():
+        img = Image.open(find(name)).convert("RGB")
+        img = cover(trim_frame(img), MAP_SIZE)
+        # The generator tends to blow out highlights; pull them back so gold markers stand out.
+        img = ImageEnhance.Brightness(ImageEnhance.Contrast(img).enhance(1.08)).enhance(0.9)
+        img.save(OUT_MAPS / f"{mid}.jpg", quality=82, optimize=True, progressive=True)
+        print(f"map {mid}")
     for eid, name in EXPRESSIONS.items():
         img = Image.open(find(name)).convert("RGBA").resize((PORTRAIT_SIZE, PORTRAIT_SIZE), Image.LANCZOS)
         img.save(OUT_EXPR / f"{eid}.webp", quality=84, method=6)
