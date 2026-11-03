@@ -5212,3 +5212,95 @@ html.vertical .cm-hero {
 .toast {
   border-radius: 10px;
 }
+
+/* chapter strip: scrolls sideways with arrows that light up when more chapters are that way */
+.chapter-strip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.story-layout .chapter-strip .chapter-list {
+  position: relative;
+  scroll-snap-type: x proximity;
+}
+.story-layout .chapter-tab {
+  scroll-snap-align: start;
+}
+.strip-arrow {
+  width: 34px;
+  height: 58px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  font-family: var(--serif);
+  font-size: 30px;
+  line-height: 1;
+  color: rgba(243, 230, 196, 0.35);
+  background: rgba(16, 9, 32, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(226, 184, 90, 0.25);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    box-shadow 0.2s,
+    background 0.2s;
+}
+.strip-arrow.more {
+  color: #2a1405;
+  background: linear-gradient(180deg, #fff2c6, #e2b85a 60%, #b07a24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 0 2px #3a2208,
+    0 0 14px rgba(226, 184, 90, 0.55);
+  animation: arrow-hint 1.8s ease-in-out infinite;
+}
+.strip-arrow:disabled {
+  cursor: default;
+}
+@keyframes arrow-hint {
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 0 0 2px #3a2208,
+      0 0 22px rgba(255, 210, 120, 0.85);
+  }
+}
+html.vertical .strip-arrow {
+  width: 26px;
+  height: 50px;
+  font-size: 24px;
+}
+
+/* map stars readable on any art */
+.cm-stars {
+  font-size: 15px;
+}
+.cm-stars i {
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 0 4px rgba(0, 0, 0, 0.9);
+}
+.cm-stars i:not(.on) {
+  color: rgba(200, 200, 210, 0.75);
+}
+
+/* stages you can't play yet: grayed out, and no trail leads to them */
+.cm-node.locked .cm-medal {
+  filter: grayscale(1) brightness(0.55);
+  box-shadow:
+    inset 0 0 0 2px rgba(200, 200, 210, 0.55),
+    0 6px 14px rgba(0, 0, 0, 0.6);
+}
+.cm-node.locked .cm-label {
+  opacity: 1;
+  color: rgba(220, 220, 230, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(200, 200, 210, 0.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .strip-arrow.more {
+    animation: none;
+  }
+}

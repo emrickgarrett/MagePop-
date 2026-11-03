@@ -137,10 +137,11 @@ export function ChapterMap({
   chap.nodes.forEach((n, i) => {
     if (n.optional) {
       const from = chap.nodes[i - 1];
-      if (from) segs.push({ a: from, b: n, dashed: true, lit: states[i].cleared, reachable: states[i].open });
+      // No trail to a stage until it opens up.
+      if (from && states[i].open) segs.push({ a: from, b: n, dashed: true, lit: states[i].cleared, reachable: states[i].open });
       return;
     }
-    if (prevReq !== null) segs.push({ a: chap.nodes[prevReq], b: n, dashed: false, lit: states[i].cleared, reachable: states[i].open });
+    if (prevReq !== null && states[i].open) segs.push({ a: chap.nodes[prevReq], b: n, dashed: false, lit: states[i].cleared, reachable: states[i].open });
     prevReq = i;
   });
 
@@ -150,7 +151,9 @@ export function ChapterMap({
     states.findIndex((s) => s.open && !s.cleared),
   );
   const lastCleared = states.map((s, i) => (s.cleared && !chap.nodes[i].optional ? i : -1)).reduce((a, b) => Math.max(a, b), -1);
-  const stand = chap.nodes[standIdx >= 0 ? standIdx : Math.max(0, lastCleared)];
+  // A finished chapter needs no marker (it would sit on top of a stage label).
+  const finished = chap.nodes.every((n, i) => n.optional || states[i].cleared);
+  const stand = finished ? undefined : chap.nodes[standIdx >= 0 ? standIdx : Math.max(0, lastCleared)];
 
   return (
     <div className="chapter-map" style={{ '--accent': hero.palette.primary } as React.CSSProperties}>

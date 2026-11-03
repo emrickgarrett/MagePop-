@@ -237,6 +237,45 @@ export function Stars({ n, size = 16 }: { n: number; size?: number }) {
   );
 }
 
+/**
+ * The row of chapter tabs. When it's wider than the screen it scrolls sideways, with arrows that
+ * light up when there's another chapter in that direction; the chosen chapter scrolls into view.
+ */
+function ChapterStrip({ active, children }: { active: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = () => {
+    const el = ref.current;
+    if (!el) return;
+    setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  };
+  useEffect(() => {
+    const el = ref.current;
+    const tab = el?.children[active] as HTMLElement | undefined;
+    if (el && tab) {
+      const l = tab.offsetLeft; // .chapter-list is position: relative
+      if (l < el.scrollLeft || l + tab.offsetWidth > el.scrollLeft + el.clientWidth) el.scrollTo({ left: l - 40, behavior: 'smooth' });
+    }
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [active]);
+  const nudge = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.7, behavior: 'smooth' });
+  return (
+    <div className="chapter-strip">
+      <button className={`strip-arrow left ${edges.left ? 'more' : ''}`} onClick={() => nudge(-1)} disabled={!edges.left} aria-label="Earlier chapters">
+        ‹
+      </button>
+      <div className="chapter-list" ref={ref} onScroll={measure}>
+        {children}
+      </div>
+      <button className={`strip-arrow right ${edges.right ? 'more' : ''}`} onClick={() => nudge(1)} disabled={!edges.right} aria-label="Later chapters">
+        ›
+      </button>
+    </div>
+  );
+}
+
 export function StoryMap({
   save,
   onBack,
@@ -314,7 +353,7 @@ export function StoryMap({
       </div>
 
       <div className="story-layout">
-        <div className="chapter-list">
+        <ChapterStrip active={chapIdx}>
           {STORY.map((c, ci) => {
             const h = getCharacter(c.cover ?? c.hero);
             const unlocked = chapterOpen(c, save.storyCleared, save.unlocked);
@@ -345,7 +384,7 @@ export function StoryMap({
               </button>
             );
           })}
-        </div>
+        </ChapterStrip>
 
         <div className="chapter-view" style={{ '--accent': hero.palette.primary } as React.CSSProperties}>
           <div className="cv-head">
