@@ -1,8 +1,9 @@
-import { AI_LEVELS, chapterId, chapterOpen, CHARACTERS, getCharacter, STORY, StoryChapter, StoryNode } from '@magepop/core';
+import { AI_LEVELS, chapterId, GemColor, chapterOpen, CHARACTERS, getCharacter, STORY, StoryChapter, StoryNode } from '@magepop/core';
 import { achievementScore } from '../game/achievements';
 import { HowToPlay } from '../components/HowToPlay';
 import { UpdateBanner } from '../components/UpdateBanner';
 import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ChapterMap } from './ChapterMap';
 import { Gem } from '../components/Gem';
 import { Portrait, SpellTable } from '../components/Hud';
 import { audio } from '../game/audio';
@@ -28,21 +29,86 @@ import {
 } from '../game/save';
 import type { RecordStats, SaveData, Settings, StoryDifficulty } from '../game/save';
 
-export function Logo() {
+/** The Academy of Gems crest: a gilded shield holding the five spell gems around a Heartstone. */
+export function Crest({ size = 136 }: { size?: number }) {
+  const gems = ['#ff3b6b', '#3c8dff', '#22d37a', '#ffc531', '#a659ff'];
+  return (
+    <svg className="crest" width={size} height={size * 1.15} viewBox="0 0 120 138" aria-hidden="true">
+      <defs>
+        <linearGradient id="crest-gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff1c2" />
+          <stop offset="0.45" stopColor="#e2b85a" />
+          <stop offset="1" stopColor="#8a5f1f" />
+        </linearGradient>
+        <linearGradient id="crest-field" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#3a1d6e" />
+          <stop offset="1" stopColor="#150a2e" />
+        </linearGradient>
+        <radialGradient id="crest-heart" cx="0.5" cy="0.4" r="0.6">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.5" stopColor="#ffe7a8" />
+          <stop offset="1" stopColor="#ff9fd0" />
+        </radialGradient>
+      </defs>
+      <path d="M60 4 L110 18 V62 C110 96 88 120 60 134 C32 120 10 96 10 62 V18 Z" fill="url(#crest-gold)" />
+      <path d="M60 12 L102 24 V62 C102 91 84 112 60 125 C36 112 18 91 18 62 V24 Z" fill="url(#crest-field)" />
+      <path d="M60 12 L102 24 V62 C102 91 84 112 60 125 C36 112 18 91 18 62 V24 Z" fill="none" stroke="#f3d58a" strokeOpacity="0.35" strokeWidth="1.5" />
+      {gems.map((c, i) => {
+        const a = (-150 + i * 30) * (Math.PI / 180);
+        const x = 60 + Math.cos(a) * 30;
+        const y = 66 + Math.sin(a) * 30;
+        return (
+          <g key={c}>
+            <circle cx={x} cy={y} r="7.5" fill="url(#crest-gold)" />
+            <circle cx={x} cy={y} r="5.5" fill={c} />
+            <circle cx={x - 1.8} cy={y - 1.8} r="1.6" fill="#fff" fillOpacity="0.75" />
+          </g>
+        );
+      })}
+      <path d="M60 52 L74 70 L60 98 L46 70 Z" fill="url(#crest-heart)" stroke="url(#crest-gold)" strokeWidth="2.5" />
+      <path d="M46 70 H74 M60 52 L55 70 L60 98 M60 52 L65 70 L60 98" stroke="#c98ab0" strokeOpacity="0.55" strokeWidth="1" fill="none" />
+      <path d="M38 108 Q60 118 82 108" stroke="url(#crest-gold)" strokeWidth="3" fill="none" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function Logo({ crest = false }: { crest?: boolean }) {
   return (
     <div className="logo">
-      <div className="logo-gems">
-        {(['ruby', 'sapphire', 'emerald', 'topaz', 'amethyst'] as const).map((k, i) => (
-          <span key={k} style={{ animationDelay: `${i * 0.15}s` }}>
-            <Gem kind={k} size={40} />
-          </span>
-        ))}
-      </div>
+      {crest ? (
+        <Crest />
+      ) : (
+        <div className="logo-gems">
+          {(['ruby', 'sapphire', 'emerald', 'topaz', 'amethyst'] as const).map((k, i) => (
+            <span key={k} style={{ animationDelay: `${i * 0.15}s` }}>
+              <Gem kind={k} size={40} />
+            </span>
+          ))}
+        </div>
+      )}
       <h1>
         Mage<span>Pop!</span>
       </h1>
       <div className="logo-sub">Match-3 Spell Duels</div>
     </div>
+  );
+}
+
+/** A main-menu entry: a gilded plaque with a gem medallion. */
+function Plaque({ gem, title, sub, tint, onClick }: { gem: GemColor; title: string; sub: string; tint: string; onClick: () => void }) {
+  return (
+    <button className="plaque" style={{ '--tint': tint } as React.CSSProperties} onClick={onClick}>
+      <span className="plaque-medal" aria-hidden="true">
+        <Gem kind={gem} size={38} />
+      </span>
+      <span className="plaque-text">
+        <b>{title}</b>
+        <small>{sub}</small>
+      </span>
+      <span className="plaque-arrow" aria-hidden="true">
+        ❯
+      </span>
+    </button>
   );
 }
 
@@ -54,32 +120,40 @@ export function MainMenu({ save, go, onQuit }: { save: SaveData; go: (s: MenuTar
   const cleared = storyNodesCleared(save);
   const next = nextStoryNode(save);
   return (
-    <div className="screen menu-screen">
+    <div className="screen menu-screen academy">
+      <div className="menu-backdrop" aria-hidden="true" style={{ backgroundImage: 'url(assets/scenes/gate.jpg)' }} />
+      <div className="menu-banner left" aria-hidden="true" />
+      <div className="menu-banner right" aria-hidden="true" />
+      <div className="menu-motes" aria-hidden="true">
+        {Array.from({ length: 18 }, (_, i) => (
+          <span key={i} style={{ left: `${(i * 53) % 100}%`, animationDelay: `${(i * 0.7) % 9}s`, animationDuration: `${9 + (i % 5) * 2}s` }} />
+        ))}
+      </div>
       <UpdateBanner />
-      <Logo />
+      <Logo crest />
       <div className="menu-buttons">
-        <button className="btn big" onClick={() => go('story')}>
-          Story
-          <small>
-            {cleared === 0
-              ? 'Start your journey'
+        <Plaque
+          gem="topaz"
+          tint="#ffc531"
+          title="Story"
+          sub={
+            cleared === 0
+              ? 'Begin your first year at the Academy'
               : next
                 ? `${cleared}/${TOTAL_STORY_NODES} steps · ★ ${storyStarsEarned(save)}`
-                : `Complete! ★ ${storyStarsEarned(save)}/${TOTAL_STARS_ALL_DIFFICULTIES}`}
-          </small>
-        </button>
-        <button className="btn big alt" onClick={() => go('quick')}>
-          Quick Battle
-          <small>Any mage vs any bot</small>
-        </button>
-        <button className="btn big alt2" onClick={() => go('endless')}>
-          Endless
-          <small>{save.endlessBest ? `Best: wave ${save.endlessBest.wave} with ${getCharacter(save.endlessBest.characterId).name}` : 'How long can you last?'}</small>
-        </button>
-        <button className="btn big alt3" onClick={() => go('pvp')}>
-          Multiplayer
-          <small>Quick Match or battle a friend</small>
-        </button>
+                : `Complete! ★ ${storyStarsEarned(save)}/${TOTAL_STARS_ALL_DIFFICULTIES}`
+          }
+          onClick={() => go('story')}
+        />
+        <Plaque gem="ruby" tint="#ff3b6b" title="Quick Battle" sub="Any mage vs any bot" onClick={() => go('quick')} />
+        <Plaque
+          gem="sapphire"
+          tint="#3c8dff"
+          title="Endless"
+          sub={save.endlessBest ? `Best: wave ${save.endlessBest.wave} with ${getCharacter(save.endlessBest.characterId).name}` : 'How long can you last?'}
+          onClick={() => go('endless')}
+        />
+        <Plaque gem="amethyst" tint="#a659ff" title="Multiplayer" sub="Quick Match or duel a friend" onClick={() => go('pvp')} />
       </div>
       <div className="menu-row">
         <button className="btn mid ghost" onClick={() => go('collection')}>
@@ -254,7 +328,7 @@ export function StoryMap({
                 style={{ '--accent': h.palette.primary } as React.CSSProperties}
                 onClick={() => pickChapter(ci)}
               >
-                <Portrait ch={h} size={46} locked={!unlocked} />
+                <Portrait ch={h} size={38} locked={!unlocked} />
                 <span className="ct-text">
                   <small>{c.anyHero ? 'Finale' : `Chapter ${ci + 1}`}</small>
                   <b>{unlocked ? c.title : '???'}</b>
@@ -300,25 +374,19 @@ export function StoryMap({
               ))}
             </div>
           )}
-          <div className="node-path">
-            {chap.nodes.map((n, i) => {
-              const isCleared = save.storyCleared.includes(n.id);
-              const isOpen = nodeOpen(save, chap, i);
-              const isNext = next?.node.id === n.id;
-              return (
-                <button
-                  key={n.id}
-                  className={`path-node k-${n.kind} ${n.optional ? 'optional' : ''} ${isCleared ? 'cleared' : ''} ${isOpen ? '' : 'locked'} ${isNext ? 'next' : ''} ${n.id === node.id ? 'sel' : ''}`}
-                  onClick={() => setNodeId(n.id)}
-                >
-                  <span className="pn-icon">{isOpen ? NODE_ICON[n.kind] : '🔒'}</span>
-                  <span className="pn-title">{n.optional ? 'Challenge' : NODE_KIND[n.kind]}</span>
-                  {isCleared ? <Stars n={nodeStarsOn(save, difficulty, n.id)} size={12} /> : <span className="pn-gap" />}
-                </button>
-              );
+          <div className="cv-body">
+          <ChapterMap
+            chap={chap}
+            hero={hero}
+            selected={node.id}
+            onSelect={setNodeId}
+            stateOf={(n, i) => ({
+              cleared: save.storyCleared.includes(n.id),
+              open: nodeOpen(save, chap, i),
+              next: next?.node.id === n.id,
+              stars: nodeStarsOn(save, difficulty, n.id),
             })}
-          </div>
-
+          />
           <div className="node-card">
             <div className="nc-head">
               <span className="nc-kind">
@@ -391,6 +459,7 @@ export function StoryMap({
             <button className="btn" disabled={!open} onClick={() => onPlay(chap, node)}>
               {!open ? '🔒 Locked' : save.storyCleared.includes(node.id) ? '↻ Replay' : '▶ Play'}
             </button>
+          </div>
           </div>
         </div>
       </div>
